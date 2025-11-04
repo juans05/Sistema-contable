@@ -1,0 +1,6 @@
+@SistemaContable.API_HostAddress = http://localhost:5151
+
+GET {{SistemaContable.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
