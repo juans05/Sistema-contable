@@ -18,5 +18,7 @@ namespace SistemaContable.Application.Services.Interfaces.IRepository
         Task SaveRefreshTokenAsync(int usuarioId, string tokenHash, DateTime expiration);
         Task InvalidateRefreshTokensAsync(int usuarioId);
         Task<RefreshTokenData?> GetRefreshTokenAsync(string tokenHash);
+
+        Task<LoginResponse> RefreshTokenAsync(string refreshToken);
     }
 }
