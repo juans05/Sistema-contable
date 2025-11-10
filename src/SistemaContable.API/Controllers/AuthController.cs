@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using SistemaContable.Application.DTOs.Requests;
 using SistemaContable.Application.DTOs.Responses;
 using SistemaContable.Application.Services.Interfaces;
+using SistemaContable.Domain.Models;
 using System.Security.Claims;
 
 namespace SistemaContable.API.Controllers
@@ -123,25 +124,23 @@ namespace SistemaContable.API.Controllers
         /// Refresca el token de acceso
         /// </summary>
         [HttpPost("refresh")]
-        [Authorize]
+        [AllowAnonymous] // Cambiar a AllowAnonymous porque el access token puede estar expirado
         [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<LoginResponse>> RefreshToken()
+        public async Task<ActionResult<LoginResponse>> RefreshToken([FromBody] RefreshTokenRequest request)
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-                if (string.IsNullOrEmpty(userId))
+                if (string.IsNullOrEmpty(request?.RefreshToken))
                 {
-                    return Unauthorized(new { message = "Token inválido" });
+                    return BadRequest(new { message = "Refresh token requerido" });
                 }
 
-                var response = await _authService.RefreshTokenAsync(userId);
+                var response = await _authService.RefreshTokenAsync(request.RefreshToken);
 
-                if (response == null)
+                if (!response.Success)
                 {
-                    return Unauthorized(new { message = "No se pudo refrescar el token" });
+                    return Unauthorized(new { message = response.Message });
                 }
 
                 return Ok(response);
@@ -151,7 +150,6 @@ namespace SistemaContable.API.Controllers
                 _logger.LogError(ex, "Error al refrescar token");
                 return StatusCode(500, new { message = "Error interno del servidor" });
             }
-            return Ok();
         }
 
         /// <summary>

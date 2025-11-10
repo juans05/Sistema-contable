@@ -128,9 +128,9 @@ namespace SistemaContable.Application.Services.Implementations
             _logger.LogInformation("Usuario {UsuarioId} cerró sesión", usuarioId);
         }
 
-        public Task<LoginResponse> RefreshTokenAsync(string refreshToken)
+        public async Task<LoginResponse> RefreshTokenAsync(string refreshToken)
         {
-            throw new NotImplementedException();
+            return await _authRepository.RefreshTokenAsync(refreshToken);
         }
 
         public async Task<LoginResponse> SwitchEmpresaAsync(int pusuario_id, string email, Guid ruc_empresa_id)

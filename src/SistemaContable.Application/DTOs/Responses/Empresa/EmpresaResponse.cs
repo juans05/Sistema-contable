@@ -1,12 +1,13 @@
-﻿using System;
+﻿using SistemaContable.Application.DTOs.Responses.Contador;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SistemaContable.Domain.Entities
+namespace SistemaContable.Application.DTOs.Responses.Empresa
 {
-    public class EEmpresa
+    public class EmpresaResponse
     {
         public Guid Id { get; set; }
         public string RazonSocial { get; set; } = string.Empty;
@@ -22,11 +23,9 @@ namespace SistemaContable.Domain.Entities
         public string? RepresentanteLegal { get; set; }
         public string? DniRepresentante { get; set; }
         public string? LogoUrl { get; set; }
-        public string? Config { get; set; } // JSONB serializado
         public bool Activo { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
-
-        public ICollection<EEmpresaUsuario> EmpresaUsuarios { get; set; } = new List<EEmpresaUsuario>();
+        public ContadorInfoResponse? Contador { get; set; }
     }
 }

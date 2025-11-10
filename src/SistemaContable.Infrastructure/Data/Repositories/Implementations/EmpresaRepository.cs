@@ -1,0 +1,352 @@
+﻿using Dapper;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+using SistemaContable.Application.DTOs.Common;
+using SistemaContable.Application.DTOs.Requests.Contadores;
+using SistemaContable.Application.DTOs.Requests.Empresa;
+using SistemaContable.Application.DTOs.Responses;
+using SistemaContable.Application.Services.Interfaces.IRepository;
+using SistemaContable.Domain.Entities;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
+{
+    public class EmpresaRepository : IEmpresaRepository
+    {
+        private readonly string _connectionString;
+        private readonly ILogger<EmpresaRepository> _logger;
+
+        public EmpresaRepository(
+            IConfiguration configuration,
+            ILogger<EmpresaRepository> logger)
+        {
+            _connectionString = configuration.GetConnectionString("DefaultConnection")
+                ?? throw new ArgumentNullException(nameof(configuration));
+            _logger = logger;
+        }
+
+        public async Task<ApiResponseDto<bool>> ActualizarAsync(UpdateEmpresaRequest dto)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var parameters = new
+                {
+                    p_id = dto.Id,
+                    p_razon_social = dto.RazonSocial,
+                    p_nombre_comercial = dto.NombreComercial,
+                    p_ruc = dto.Ruc,
+                    p_direccion = dto.Direccion,
+                    p_telefono = dto.Telefono,
+                    p_email = dto.Email,
+                    p_web = dto.Web,
+                    p_regimen_tributario = dto.RegimenTributario,
+                    p_tipo_contribuyente = dto.TipoContribuyente,
+                    p_fecha_constitucion = dto.FechaConstitucion,
+                    p_representante_legal = dto.RepresentanteLegal,
+                    p_dni_representante = dto.DniRepresentante,
+                    p_logo_url = dto.LogoUrl,
+                    p_config = (object?)null
+                };
+
+                var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT * FROM ""suizaConta"".sp_empresa_actualizar(
+                    @p_id, @p_razon_social, @p_nombre_comercial, @p_ruc,
+                    @p_direccion, @p_telefono, @p_email, @p_web,
+                    @p_regimen_tributario, @p_tipo_contribuyente, @p_fecha_constitucion,
+                    @p_representante_legal, @p_dni_representante, @p_logo_url, @p_config
+                )",
+                    parameters,
+                    commandType: CommandType.Text,
+                    commandTimeout: 30
+                );
+
+                return new ApiResponseDto<bool>
+                {
+                    Success = result.success,
+                    Message = result.message,
+                    Data = result.success
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al actualizar empresa {EmpresaId}", dto.Id);
+                throw;
+            }
+        }
+
+        public async Task<ApiResponseDto<bool>> AsignarContadorAsync(AsignarContadorRequest dto, int asignadoPor)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var parameters = new
+                {
+                    p_empresa_id = dto.EmpresaId,
+                    p_contador_id = dto.ContadorId,
+                    p_asignado_por = asignadoPor,
+                    p_puede_crear_usuarios = dto.PuedeCrearUsuarios,
+                    p_puede_modificar_config = dto.PuedeModificarConfig,
+                    p_puede_eliminar = dto.PuedeEliminar
+                };
+
+                var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT * FROM ""suizaConta"".sp_empresa_asignar_contador(
+                    @p_empresa_id, @p_contador_id, @p_asignado_por,
+                    @p_puede_crear_usuarios, @p_puede_modificar_config, @p_puede_eliminar
+                )",
+                    parameters,
+                    commandType: CommandType.Text,
+                    commandTimeout: 10
+                );
+
+                return new ApiResponseDto<bool>
+                {
+                    Success = result.success,
+                    Message = result.message,
+                    Data = result.success
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al asignar contador");
+                throw;
+            }
+        }
+
+        public async Task<ApiResponseDto<bool>> CambiarEstadoAsync(Guid empresaId, bool activo)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var parameters = new
+                {
+                    p_id = empresaId,
+                    p_activo = activo
+                };
+
+                var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT * FROM ""suizaConta"".sp_empresa_cambiar_estado(@p_id, @p_activo)",
+                    parameters,
+                    commandType: CommandType.Text,
+                    commandTimeout: 10
+                );
+
+                if (result == null)
+                {
+                    _logger.LogWarning(
+                        "No se obtuvo respuesta al cambiar estado de empresa {EmpresaId} a {Estado}",
+                        empresaId,
+                        activo
+                    );
+
+                    return new ApiResponseDto<bool>
+                    {
+                        Success = false,
+                        Message = "Error al cambiar estado de la empresa",
+                        Data = false
+                    };
+                }
+
+                return new ApiResponseDto<bool>
+                {
+                    Success = result.success,
+                    Message = result.message,
+                    Data = result.success
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error al cambiar estado de empresa {EmpresaId} a {Estado}",
+                    empresaId,
+                    activo
+                );
+                throw;
+            }
+        }
+
+        public async Task<ApiResponseDto<Guid>> CrearAsync(CreateEmpresaRequest dto)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var parameters = new
+                {
+                    p_razon_social = dto.RazonSocial,
+                    p_nombre_comercial = dto.NombreComercial,
+                    p_ruc = dto.Ruc,
+                    p_direccion = dto.Direccion,
+                    p_telefono = dto.Telefono,
+                    p_email = dto.Email,
+                    p_web = dto.Web,
+                    p_regimen_tributario = dto.RegimenTributario,
+                    p_tipo_contribuyente = dto.TipoContribuyente,
+                    p_fecha_constitucion = dto.FechaConstitucion,
+                    p_representante_legal = dto.RepresentanteLegal,
+                    p_dni_representante = dto.DniRepresentante,
+                    p_logo_url = dto.LogoUrl,
+                    p_config = (object?)null,
+                    p_contador_id = dto.ContadorId
+                };
+
+                var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT * FROM ""suizaConta"".sp_empresa_crear(
+                    @p_razon_social, @p_nombre_comercial, @p_ruc, @p_direccion,
+                    @p_telefono, @p_email, @p_web, @p_regimen_tributario,
+                    @p_tipo_contribuyente, @p_fecha_constitucion, @p_representante_legal,
+                    @p_dni_representante, @p_logo_url, @p_config, @p_contador_id
+                )",
+                    parameters,
+                    commandType: CommandType.Text,
+                    commandTimeout: 30
+                );
+
+                return new ApiResponseDto<Guid>
+                {
+                    Success = result.success,
+                    Message = result.message,
+                    Data = result.id
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al crear empresa");
+                throw;
+            }
+        }
+
+        public async Task<ApiResponseDto<bool>> EliminarAsync(Guid empresaId)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
+                    @"SELECT * FROM ""suizaConta"".sp_empresa_eliminar(@p_id)",
+                    new { p_id = empresaId },
+                    commandType: CommandType.Text,
+                    commandTimeout: 10
+                );
+
+                return new ApiResponseDto<bool>
+                {
+                    Success = result.success,
+                    Message = result.message,
+                    Data = result.success
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al eliminar empresa {EmpresaId}", empresaId);
+                throw;
+            }
+        }
+
+        public async Task<PagedResultDto<EEmpresa>> ListarAsync(EmpresaQueryRequest empresaQueryRequest)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var parameters = new
+                {
+                    p_usuario_id = empresaQueryRequest.UsuarioId,
+                    p_es_contador = empresaQueryRequest.EsContador,
+                    p_activo = empresaQueryRequest.Activo,
+                    p_search = empresaQueryRequest.Search,
+                    p_page_number = empresaQueryRequest.PageNumber,
+                    p_page_size = empresaQueryRequest.PageSize
+                };
+
+                var result = await connection.QueryAsync<EEmpresa>(
+                    @"SELECT * FROM ""suizaConta"".sp_empresa_listar(
+                    @p_usuario_id, @p_es_contador, @p_activo, 
+                    @p_search, @p_page_number, @p_page_size
+                )",
+                    parameters,
+                    commandType: CommandType.Text,
+                    commandTimeout: 30
+                );
+
+                var empresas = result.ToList();
+                var totalRecords = empresas.Count();
+
+                return new PagedResultDto<EEmpresa>
+                {
+                    TotalRecords = totalRecords,
+                    PageNumber = empresaQueryRequest.PageNumber,
+                    PageSize = empresaQueryRequest.PageSize,
+                    Data = empresas
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al listar empresas");
+                throw;
+            }
+        }
+
+        public async Task<List<EContadorDto>> ListarContadoresAsync()
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var contadores = await connection.QueryAsync<EContadorDto>(
+                    @"SELECT * FROM ""suizaConta"".sp_contadores_listar()",
+                    commandType: CommandType.Text,
+                    commandTimeout: 10
+                );
+
+                return contadores.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al listar contadores");
+                throw;
+            }
+        }
+
+        public async Task<EEmpresa?> ObtenerPorIdAsync(Guid empresaId)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var empresa = await connection.QueryFirstOrDefaultAsync<EEmpresa>(
+                    @"SELECT * FROM ""suizaConta"".sp_empresa_obtener_por_id(@p_empresa_id)",
+                    new { p_empresa_id = empresaId },
+                    commandType: CommandType.Text,
+                    commandTimeout: 10
+                );
+
+                return empresa;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener empresa {EmpresaId}", empresaId);
+                throw;
+            }
+        }
+    }
+}

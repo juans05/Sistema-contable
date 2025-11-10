@@ -14,4 +14,8 @@ namespace SistemaContable.Domain.Models
         public DateTime FechaExpiracion { get; set; }
         public bool Activo { get; set; }
     }
+    public class RefreshTokenRequest
+    {
+        public string RefreshToken { get; set; } = string.Empty;
+    }
 }

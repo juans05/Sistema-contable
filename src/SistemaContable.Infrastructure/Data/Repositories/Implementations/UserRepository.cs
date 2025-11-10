@@ -4,6 +4,7 @@ using Npgsql;
 using SistemaContable.Application.DTOs.Requests;
 using SistemaContable.Application.DTOs.Responses;
 using SistemaContable.Application.Services.Implementations;
+using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Domain.Entities;
 using SistemaContable.Domain.Models;
@@ -16,11 +17,14 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
     public class UserRepository : IAuthRepository
     {
         private readonly string _connectionString;
-
-        public UserRepository(IConfiguration configuration)
+        private readonly IJwtTokenService _jwtTokenService;
+        private readonly IPasswordService _passwordService;
+        public UserRepository(IConfiguration configuration, IJwtTokenService jwtTokenService, IPasswordService passwordService )
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")
                 ?? throw new InvalidOperationException("Connection string no configurada");
+            _jwtTokenService = jwtTokenService;
+            _passwordService = passwordService;
         }
 
         public async Task<RefreshTokenData?> GetRefreshTokenAsync(string tokenHash)
@@ -314,6 +318,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 var empresaData = await connection.QueryFirstOrDefaultAsync<EmpresaUsuarioResult>(
                     @"SELECT 
                     eu.empresa_id AS EmpresaId,
+                    e.ruc AS ruc,  
                     e.nombre_comercial AS EmpresaNombre,
                     eu.rol AS Rol
                   FROM ""suizaConta"".empresa_usuarios eu
@@ -348,24 +353,26 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 );
 
                 // Generar nuevos tokens
-                var userData = new UserSessionData
+                var userData = new LoginData
                 {
-                    UsuarioId = usuario.UsuarioId,
+                    usuario_id = usuario.UsuarioId,
+                    empresa_id = empresaData.EmpresaId,
+                    Ruc =  empresaData.ruc,
                     Email = usuario.Email,
-                    Username = usuario.Username,
+                    username = usuario.Username,
                     NombreCompleto = usuario.NombreCompleto,
-                    EsContador = usuario.EsContador,
+                  /*  EsContador = usuario.EsContador,
                     EsSuperAdmin = usuario.EsSuperAdmin,
-                    EmpresaId = empresaData.EmpresaId,
+                    EmpresaId = empresaData.EmpresaId,*/
                     EmpresaNombre = empresaData.EmpresaNombre,
-                    Rol = empresaData.Rol |
+                    Rol = empresaData.Rol
                 };
 
                 var newToken = _jwtTokenService.GenerateToken(userData);
                 var newRefreshToken = _jwtTokenService.GenerateRefreshToken();
 
                 // Guardar el nuevo refresh token
-                var newTokenHash = PasswordService.HashPassword(newRefreshToken);
+                var newTokenHash = _passwordService.HashPassword(newRefreshToken);
                 await SaveRefreshTokenAsync(
                     usuario.UsuarioId,
                     newTokenHash,
@@ -383,7 +390,15 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     Message = "Token renovado exitosamente",
                     Token = newToken,
                     RefreshToken = newRefreshToken,
-                    UserData = userData
+                    UserData = new UserSessionData
+                    {
+                        Username = usuario.Username,
+                        Email = usuario.Email,
+                        NombreCompleto = usuario.NombreCompleto,
+                        ruc = empresaData.ruc,
+                        EmpresaNombre = empresaData.EmpresaNombre,
+                        Rol = empresaData.Rol
+                    }
                 };
             }
             catch (Exception ex)

@@ -19,5 +19,8 @@ namespace SistemaContable.Domain.Entities
         public bool Activo { get; set; }
         public DateTime FechaCreacion { get; set; }
         public DateTime? FechaModificacion { get; set; }
+
+        public ICollection<EEmpresaUsuario> EmpresaUsuarios { get; set; } = new List<EEmpresaUsuario>();
     }
 }
+

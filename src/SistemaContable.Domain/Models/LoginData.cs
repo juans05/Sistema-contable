@@ -24,4 +24,22 @@ namespace SistemaContable.Domain.Models
         public Guid empresa_id { get; set; }
         public bool Activo { get; set; }
     }
+    public record UsuarioDataResult
+    {
+        public int UsuarioId { get; init; }
+        public string Email { get; init; } = string.Empty;
+        public string Username { get; init; } = string.Empty;
+        public string NombreCompleto { get; init; } = string.Empty;
+        public bool EsContador { get; init; }
+        public bool EsSuperAdmin { get; init; }
+        public bool Activo { get; init; }
+    }
+
+    public record EmpresaUsuarioResult
+    {
+        public Guid EmpresaId { get; init; }
+        public string EmpresaNombre { get; init; } = string.Empty;
+        public string Rol { get; init; } = string.Empty;
+        public string ruc { get; init; } = string.Empty;
+    }
 }
