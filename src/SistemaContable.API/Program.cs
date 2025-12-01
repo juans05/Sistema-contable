@@ -5,7 +5,7 @@ using SistemaContable.Application.Services.Implementations;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Infrastructure.Data.Repositories.Implementations;
-using SistemaContable.Infrastructure.Data.Repositories.Interfaces;
+using SistemaContable.Infrastructurxe.Data.Repositories.Implementations;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -108,12 +108,14 @@ builder.Services.AddCors(options =>
 
 // Repositories
 builder.Services.AddScoped<IAuthRepository, UserRepository>();
-builder.Services.AddSingleton<IPasswordService, PasswordService>();
-builder.Services.AddSingleton<IJwtTokenService,JwtTokenService>();
+builder.Services.AddScoped<IVentaRepository, VentaRepository>(); // ? NUEVO
+builder.Services.AddScoped<IFacturaElectronicaRepository, FacturaElectronicaRepository>(); // ? NUEVO
 
 // Services
+builder.Services.AddSingleton<IPasswordService, PasswordService>();
+builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-
+builder.Services.AddScoped<IVentaElectronicaService, VentaElectronicaService>();
 var app = builder.Build();
 
 // ===== CONFIGURACIÓN DEL PIPELINE =====

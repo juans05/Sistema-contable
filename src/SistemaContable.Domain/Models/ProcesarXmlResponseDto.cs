@@ -1,13 +1,12 @@
-﻿using SistemaContable.Domain.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SistemaContable.Application.DTOs.Responses.XML
+namespace SistemaContable.Domain.Models
 {
-    public class ProcesarXmlVentaResponseDto
+    public class ProcesarXmlResponseDto
     {
         public bool Exito { get; set; }
         public string Mensaje { get; set; }

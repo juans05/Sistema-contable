@@ -32,6 +32,8 @@ namespace SistemaContable.Domain.Entities
         public string TipOperaSunat { get; set; }
         public DateTime CreatedAt { get; set; }
 
+        public string UsuarioCreacion { get; set; }
+
         // Navegación
         public virtual EFacturaElectronica FacturaElectronica { get; set; }
         public virtual ICollection<ERegistroVentaDetalle> Detalles { get; set; }
