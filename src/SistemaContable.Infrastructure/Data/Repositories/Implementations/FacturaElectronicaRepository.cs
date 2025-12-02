@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Domain.Models;
+using SistemaContable.Domain.ValueObjects;
 using SistemaContable.Infrastructurxe.Data.Repositories.Implementations;
 using System;
 using System.Collections.Generic;
@@ -27,7 +28,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             _logger = logger;
         }
         public async Task<SpResultado> InsertarFacturaElectronicaAsync(
-            FacturaElectronicaDto factura, string usuario)
+            FacturaElectronicaDto factura, string usuario, string rucEmpresa)
         {
             try
             {
@@ -48,11 +49,12 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     p_monto_total = factura.MontoTotal,
                     p_xml_original = factura.XmlOriginal,
                     p_codigo_hash = factura.CodigoHash,
-                    p_usuario_creacion = usuario
+                    p_usuario_creacion = usuario,
+                    p_ruc_empresa = rucEmpresa
                 };
 
                 var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM \"suizaConta\".sp_insertar_factura_electronica(@p_serie, @p_numero, @p_numero_completo, @p_tipo_documento, @p_fecha_emision, @p_fecha_vencimiento, @p_moneda, @p_monto_base, @p_monto_igv, @p_monto_total, @p_xml_original, @p_codigo_hash, @p_usuario_creacion)",
+                    "SELECT * FROM \"suizaConta\".sp_insertar_factura_electronica(@p_serie, @p_numero, @p_numero_completo, @p_tipo_documento, @p_fecha_emision, @p_fecha_vencimiento, @p_moneda, @p_monto_base, @p_monto_igv, @p_monto_total, @p_xml_original, @p_codigo_hash, @p_usuario_creacion,@p_ruc_empresa)",
                     parameters,
                     commandTimeout: 30
                 );
@@ -70,7 +72,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             }
         }
 
-        public async Task<SpResultado> InsertarRegistroVentaAsync(RegistroVentaDto venta, string usuario)
+        public async Task<SpResultado> InsertarRegistroVentaAsync(RegistroVentaDto venta, string usuario, string rucEmpresa,int estado)
         {
             try
             {
@@ -95,11 +97,14 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     p_imp_igv = venta.ImpIgv,
                     p_total_doc = venta.TotalDoc,
                     p_tip_opera_sunat = venta.TipOperaSunat,
-                    p_usuario_creacion = usuario
+                    p_usuario_creacion = usuario,
+                    p_estado =  estado,
+                    p_ruc_empresa= rucEmpresa
                 };
 
                 var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM sp_insertar_registro_venta(@p_id_factura_electronica, @p_ruc_cliente, @p_periodo, @p_rs_cliente, @p_tipo_doc, @p_serie_doc, @p_num_doc, @p_fecha_emision, @p_fecha_vencimiento, @p_tip_cambio, @p_tipo_doc_cliente, @p_moneda, @p_sub_total, @p_imp_igv, @p_total_doc, @p_tip_opera_sunat, @p_usuario_creacion)",
+                    "SELECT * FROM \"suizaConta\".sp_insertar_registro_venta(@p_id_factura_electronica, @p_ruc_cliente, @p_periodo, @p_rs_cliente, @p_tipo_doc, @p_serie_doc, @p_num_doc," +
+                    " @p_fecha_emision, @p_fecha_vencimiento, @p_tip_cambio, @p_tipo_doc_cliente, @p_moneda, @p_sub_total, @p_imp_igv, @p_total_doc, @p_tip_opera_sunat, @p_usuario_creacion,@p_estado, @p_rucempresa)",
                     parameters,
                     commandTimeout: 30
                 );
@@ -144,7 +149,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 };
 
                 var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM sp_insertar_venta_detalle(@p_id_reg_venta, @p_numero_linea, @p_codigo_producto, @p_descripcion_producto, @p_unidad_medida, @p_cantidad, @p_precio_unitario, @p_precio_unitario_con_igv, @p_valor_venta, @p_descuento, @p_monto_igv, @p_total_linea, @p_tipo_afectacion_igv, @p_porcentaje_igv)",
+                    "SELECT * FROM \"suizaConta\".sp_insertar_venta_detalle(@p_id_reg_venta, @p_numero_linea, @p_codigo_producto, @p_descripcion_producto, @p_unidad_medida, @p_cantidad, @p_precio_unitario, @p_precio_unitario_con_igv, @p_valor_venta, @p_descuento, @p_monto_igv, @p_total_linea, @p_tipo_afectacion_igv, @p_porcentaje_igv)",
                     parameters,
                     commandTimeout: 30
                 );
@@ -233,7 +238,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         public async Task<List<VentaListaDto>> ListarVentasAsync(
             DateTime fechaDesde, DateTime fechaHasta,
             string rucCliente = null, string tipoDoc = null,
-            string estadoDoc = null, int limite = 100, int offset = 0)
+            string estadoDoc = null, string _RucEmpresa = null, int limite = 100, int offset = 0)
         {
             try
             {
@@ -247,12 +252,13 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     p_ruc_cliente = rucCliente,
                     p_tipo_doc = tipoDoc,
                     p_estado_doc = estadoDoc,
+                    p_ruc_empresa = _RucEmpresa,
                     p_limite = limite,
                     p_offset = offset
                 };
 
                 var result = await connection.QueryAsync<VentaListaDto>(
-                    "SELECT * FROM sp_listar_ventas(@p_fecha_desde, @p_fecha_hasta, @p_ruc_cliente, @p_tipo_doc, @p_estado_doc, @p_limite, @p_offset)",
+                    "SELECT * FROM \"suizaConta\".sp_listar_ventas(@p_fecha_desde, @p_fecha_hasta, @p_ruc_cliente, @p_tipo_doc, @p_estado_doc,@p_ruc_empresa, @p_limite, @p_offset)",
                     parameters,
                     commandTimeout: 60
                 );
@@ -265,6 +271,8 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 return new List<VentaListaDto>();
             }
         }
+
+
 
         public async Task<SpResultado> ActualizarEstadoSunatAsync(
             int idFactura, string estado, string codigo, string mensaje,
@@ -286,7 +294,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 };
 
                 var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM sp_actualizar_estado_sunat(@p_id_factura_electronica, @p_estado_sunat, @p_codigo_respuesta, @p_mensaje_sunat, @p_cdr_sunat, @p_xml_firmado)",
+                    "SELECT * FROM \"suizaConta\".sp_actualizar_estado_sunat(@p_id_factura_electronica, @p_estado_sunat, @p_codigo_respuesta, @p_mensaje_sunat, @p_cdr_sunat, @p_xml_firmado)",
                     parameters,
                     commandTimeout: 30
                 );
@@ -301,20 +309,22 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         }
 
 
-        public async Task<bool> ExisteFacturaPorHashAsync(string hash)
+        public async Task<bool> ExisteFacturaPorHashAsync(string hash,string ruc)
         {
             await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
 
             return await connection.ExecuteScalarAsync<bool>(
                 @"SELECT EXISTS(
-            SELECT 1 FROM ""suizaConta"".facturas_electronicas 
-            WHERE codigo_hash = @Hash
-        )",
-                new { Hash = hash },
+                        SELECT 1 FROM ""suizaConta"".facturas_electronicas 
+                        WHERE codigo_hash = @Hash and estado=1 and  rucempresa=@ruc
+                    )",
+                new { Hash = hash, ruc  = ruc },
                 commandTimeout: 10
             );
         }
+
+
         public async Task<SpResultado> AnularVentaAsync(int idRegVenta, string motivo, string usuario)
         {
             try
@@ -342,9 +352,9 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             }
         }
 
-        public async Task<FacturaElectronicaDto> CrearAsync(FacturaElectronicaDto factura, string usuario)
+        public async Task<FacturaElectronicaDto> CrearAsync(FacturaElectronicaDto factura, string usuario, string rucEmpresa)
         {
-            var resultado = await InsertarFacturaElectronicaAsync(factura, usuario);
+            var resultado = await InsertarFacturaElectronicaAsync(factura, usuario, rucEmpresa);
 
             if (resultado.OIdFactura.HasValue)
             {
@@ -354,5 +364,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
             throw new Exception(resultado.OMensaje ?? "Error al crear factura");
         }
+
+       
     }
 }

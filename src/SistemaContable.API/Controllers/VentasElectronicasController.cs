@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Domain.Models;
+using System.Security.Claims;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -8,17 +10,21 @@ namespace SistemaContable.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class VentasElectronicasController : ControllerBase
     {
         private readonly IVentaElectronicaService _service;
         private readonly ILogger<VentasElectronicasController> _logger;
-
+        private readonly IRucEmpresaService _rucEmpresaService;
+        private readonly string _RucEmpresa = "";
         public VentasElectronicasController(
-            IVentaElectronicaService service,
+            IVentaElectronicaService service, IRucEmpresaService rucEmpresaService,
             ILogger<VentasElectronicasController> logger)
         {
+            _rucEmpresaService = rucEmpresaService;
             _service = service;
             _logger = logger;
+            _RucEmpresa = _rucEmpresaService.ObtenerRucActual();
         }
         [HttpPost("procesar-xml")]
         [ProducesResponseType(typeof(ProcesarXmlResponseDto), 200)]
@@ -28,6 +34,20 @@ namespace SistemaContable.API.Controllers
         {
             try
             {
+                // ✅ Obtener RUC automáticamente
+              //  var rucEmpresa = _rucEmpresaService.ObtenerRucActual();
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim))
+                {
+                    _logger.LogWarning("Token válido pero sin UserId en claims");
+                    return Unauthorized(new { message = "Usuario no identificado en el token" });
+                }
+
+                var userId = int.Parse(userIdClaim);
+
+                // Extraer EmpresaId del token o del query parameter
+                var empresaIdClaim = User.FindFirst("Ruc")?.Value;
+                Guid currentEmpresaId;
                 if (archivos == null || !archivos.Any())
                     return BadRequest(new { mensaje = "Debe enviar al menos un archivo XML" });
 
@@ -53,7 +73,7 @@ namespace SistemaContable.API.Controllers
                     });
 
                 var usuario = User.Identity?.Name ?? "SYSTEM";
-                var resultado = await _service.ProcesarXmlYRegistrarVentaAsync(archivos, usuario);
+                var resultado = await _service.ProcesarXmlYRegistrarVentaAsync(archivos, usuario, _RucEmpresa);
 
                 return Ok(resultado);
             }
@@ -106,8 +126,10 @@ namespace SistemaContable.API.Controllers
         {
             try
             {
+
+                var usuario = User.Identity?.Name ?? "SYSTEM";
                 var ventas = await _service.ListarVentasAsync(
-                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc);
+                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa);
 
                 return Ok(new
                 {

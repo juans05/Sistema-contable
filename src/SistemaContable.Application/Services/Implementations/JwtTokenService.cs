@@ -46,6 +46,7 @@ namespace SistemaContable.Application.Services.Implementations
             new Claim(ClaimTypes.Email, loginData.Email),
             new Claim(ClaimTypes.Name, loginData.NombreCompleto),
             new Claim("EmpresaId", loginData.empresa_id.ToString()),
+            new Claim("RUC", loginData.Ruc.ToString()),
             new Claim("EmpresaNombre", loginData.EmpresaNombre),
             new Claim(ClaimTypes.Role, loginData.Rol),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())

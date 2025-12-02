@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using SistemaContable.API.Middlewares;
 using SistemaContable.Application.Services.Implementations;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
@@ -116,8 +117,10 @@ builder.Services.AddSingleton<IPasswordService, PasswordService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVentaElectronicaService, VentaElectronicaService>();
+builder.Services.AddScoped<IRucEmpresaService, RucEmpresaService>();
 var app = builder.Build();
 
+app.UseMiddleware<RucEmpresaMiddleware>();
 // ===== CONFIGURACIÓN DEL PIPELINE =====
 app.UseSwagger();
 

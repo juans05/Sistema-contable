@@ -21,6 +21,8 @@ namespace SistemaContable.Domain.Models
         public decimal MontoTotal { get; set; }
         public string XmlOriginal { get; set; }
         public string CodigoHash { get; set; }
+
+        public string RucEmpresa { get; set; }
     }
 
     public class RegistroVentaDto
@@ -42,6 +44,9 @@ namespace SistemaContable.Domain.Models
         public decimal ImpIgv { get; set; }
         public decimal TotalDoc { get; set; }
         public string TipOperaSunat { get; set; }
+        public int estadoDocumento { get; set; }
+
+        public string RucEmpresa { get; set; }
     }
 
     public class RegistroVentaDetalleDto

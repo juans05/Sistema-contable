@@ -12,11 +12,11 @@ namespace SistemaContable.Application.Services.Interfaces
     public  interface IVentaElectronicaService
     {
         Task<ProcesarXmlResponseDto> ProcesarXmlYRegistrarVentaAsync(
-           List<IFormFile> archivosXml, string usuario);
+           List<IFormFile> archivosXml, string usuario, string rucEmpresa);
         Task<VentaCompletaDto> ObtenerVentaPorIdAsync(int idRegVenta);
         Task<List<VentaListaDto>> ListarVentasAsync(
             DateTime fechaDesde, DateTime fechaHasta,
             string rucCliente = null, string tipoDoc = null,
-            string estadoDoc = null);
+            string estadoDoc = null, string _RucEmpresa = null);
     }
 }

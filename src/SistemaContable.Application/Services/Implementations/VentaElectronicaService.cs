@@ -33,12 +33,12 @@ namespace SistemaContable.Application.Services.Implementations
         }
 
         public async Task<List<VentaListaDto>> ListarVentasAsync(DateTime fechaDesde, DateTime fechaHasta, string rucCliente = null,
-                                                                 string tipoDoc = null, string estadoDoc = null)
+                                                                 string tipoDoc = null, string estadoDoc = null,string _RucEmpresa = null)
         {
             try
             {
                 return await _facturaRepository.ListarVentasAsync(
-                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, 1000, 0);
+                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa, 1000, 0);
             }
             catch (Exception ex)
             {
@@ -52,7 +52,7 @@ namespace SistemaContable.Application.Services.Implementations
             return await _facturaRepository.ObtenerVentaCompletaAsync(idRegVenta);
         }
 
-        public async Task<ProcesarXmlResponseDto> ProcesarXmlYRegistrarVentaAsync(List<IFormFile> archivosXml, string usuario)
+        public async Task<ProcesarXmlResponseDto> ProcesarXmlYRegistrarVentaAsync(List<IFormFile> archivosXml, string usuario, string ruc)
         {
             var response = new ProcesarXmlResponseDto
             {
@@ -76,7 +76,7 @@ namespace SistemaContable.Application.Services.Implementations
                     var hash = CalcularHash(xmlContent);
 
                     // 3. Verificar duplicados
-                    if (await _facturaRepository.ExisteFacturaPorHashAsync(hash))
+                    if (await _facturaRepository.ExisteFacturaPorHashAsync(hash, ruc))
                     {
                         resultado.Procesado = false;
                         resultado.Error = "Documento duplicado (hash ya existe)";
@@ -101,11 +101,12 @@ namespace SistemaContable.Application.Services.Implementations
                         MontoIgv = datosXml.MontoIgv,
                         MontoTotal = datosXml.MontoTotal,
                         XmlOriginal = xmlContent,
-                        CodigoHash = hash
+                        CodigoHash = hash,
+                        RucEmpresa = ruc
                     };
 
                     var resultadoFactura = await _facturaRepository.InsertarFacturaElectronicaAsync(
-                        facturaDto, usuario);
+                        facturaDto, usuario, ruc);
 
                     if (resultadoFactura.OExisteDuplicado || !resultadoFactura.OIdFactura.HasValue)
                     {
@@ -135,11 +136,12 @@ namespace SistemaContable.Application.Services.Implementations
                         SubTotal = datosXml.MontoBase,
                         ImpIgv = datosXml.MontoIgv,
                         TotalDoc = datosXml.MontoTotal,
-                        TipOperaSunat = datosXml.TipoOperacion
+                        TipOperaSunat = datosXml.TipoOperacion,
+                        RucEmpresa = ruc
                     };
 
                     var resultadoVenta = await _facturaRepository.InsertarRegistroVentaAsync(
-                        ventaDto, usuario);
+                        ventaDto, usuario,ruc,1);
 
                     if (resultadoVenta.OExisteDuplicado || !resultadoVenta.OIdRegVenta.HasValue)
                     {
@@ -201,132 +203,132 @@ namespace SistemaContable.Application.Services.Implementations
             return response;
         }
 
-        public async Task<ProcesarXmlVentaResponseDto> ProcesarXmlYRegistrarVentaAsync(List<IFormFile> archivosXml, string usuario, ResultadoProcesamiento resultado)
-        {
-            var response = new ProcesarXmlVentaResponseDto
-            {
-                Resultados = new List<ResultadoProcesamiento>()
-            };
+        //public async Task<ProcesarXmlVentaResponseDto> ProcesarXmlYRegistrarVentaAsync(List<IFormFile> archivosXml, string usuario, ResultadoProcesamiento resultado)
+        //{
+        //    var response = new ProcesarXmlVentaResponseDto
+        //    {
+        //        Resultados = new List<ResultadoProcesamiento>()
+        //    };
 
-            foreach (var archivo in archivosXml)
-            {
-                var resultadoxx = new ResultadoProcesamiento
-                {
-                    NombreArchivo = archivo.FileName
-                };
+        //    foreach (var archivo in archivosXml)
+        //    {
+        //        var resultadoxx = new ResultadoProcesamiento
+        //        {
+        //            NombreArchivo = archivo.FileName
+        //        };
 
-                try
-                {
-                    // 1. Leer XML
-                    using var stream = archivo.OpenReadStream();
-                    using var reader = new StreamReader(stream);
-                    var xmlContent = await reader.ReadToEndAsync();
+        //        try
+        //        {
+        //            // 1. Leer XML
+        //            using var stream = archivo.OpenReadStream();
+        //            using var reader = new StreamReader(stream);
+        //            var xmlContent = await reader.ReadToEndAsync();
 
-                    // 2. Parsear XML
-                    var datosXml = ParsearFacturaXml(xmlContent);
+        //            // 2. Parsear XML
+        //            var datosXml = ParsearFacturaXml(xmlContent);
 
-                    // 3. Verificar duplicados
-                    var hash = CalcularHash(xmlContent);
-                    if (await _facturaRepository.ExisteFacturaPorHashAsync(hash))
-                    {
-                        resultado.Procesado = false;
-                        resultado.Error = "Documento ya registrado (duplicado)";
-                        response.Resultados.Add(resultadoxx);
-                        continue;
-                    }
+        //            // 3. Verificar duplicados
+        //            var hash = CalcularHash(xmlContent);
+        //            if (await _facturaRepository.ExisteFacturaPorHashAsync(hash, ruc))
+        //            {
+        //                resultado.Procesado = false;
+        //                resultado.Error = "Documento ya registrado (duplicado)";
+        //                response.Resultados.Add(resultadoxx);
+        //                continue;
+        //            }
 
-                    // 4. Guardar Factura Electrónica
-                    var factura = new FacturaElectronicaDto
-                    {
-                        Serie = datosXml.Serie,
-                        Numero = datosXml.Numero,
-                        NumeroCompleto = datosXml.NumeroCompleto,
-                        TipoDocumento = datosXml.TipoDocumento,
-                        FechaEmision = datosXml.FechaEmision,
-                        FechaVencimiento = datosXml.FechaVencimiento,
-                        Moneda = datosXml.Moneda,
-                        MontoBase = datosXml.MontoBase,
-                        MontoIgv = datosXml.MontoIgv,
-                        MontoTotal = datosXml.MontoTotal,                     
-                        CodigoHash = hash,
-                        XmlOriginal = xmlContent
-                    };
+        //            // 4. Guardar Factura Electrónica
+        //            var factura = new FacturaElectronicaDto
+        //            {
+        //                Serie = datosXml.Serie,
+        //                Numero = datosXml.Numero,
+        //                NumeroCompleto = datosXml.NumeroCompleto,
+        //                TipoDocumento = datosXml.TipoDocumento,
+        //                FechaEmision = datosXml.FechaEmision,
+        //                FechaVencimiento = datosXml.FechaVencimiento,
+        //                Moneda = datosXml.Moneda,
+        //                MontoBase = datosXml.MontoBase,
+        //                MontoIgv = datosXml.MontoIgv,
+        //                MontoTotal = datosXml.MontoTotal,                     
+        //                CodigoHash = hash,
+        //                XmlOriginal = xmlContent
+        //            };
 
-                    var facturaGuardada = await _facturaRepository.CrearAsync(factura, usuario);
+        //            var facturaGuardada = await _facturaRepository.CrearAsync(factura, usuario);
 
-                    // 5. Crear Registro de Venta
-                    var venta = new ERegistroVenta
-                    {
-                        IdFacturaElectronica = facturaGuardada.IdFacturaElectronica,
-                        RucCliente = datosXml.ClienteRuc,
-                        Periodo = datosXml.FechaEmision.ToString("yyyyMM"),
-                        RSCliente = datosXml.ClienteRazonSocial,
-                        TipoDoc = datosXml.TipoDocumento,
-                        SerieDoc = datosXml.Serie,
-                        NumDoc = datosXml.Numero,
-                        FechaEmision = datosXml.FechaEmision,
-                        FechaVencimiento = datosXml.FechaVencimiento,
-                        TipCambio = datosXml.TipoCambio,
-                        TipoDocCliente = datosXml.ClienteTipoDocumento,
-                        Moneda = datosXml.Moneda,
-                        SubTotal = datosXml.MontoBase,
-                        ImpIgv = datosXml.MontoIgv,
-                        TotalDoc = datosXml.MontoTotal,
-                        EstadoDoc = "ACTIVO",
-                        TipOperaSunat = datosXml.TipoOperacion,
-                        CreatedAt = DateTime.UtcNow,
-                        Detalles = new List<ERegistroVentaDetalle>()
-                    };
+        //            // 5. Crear Registro de Venta
+        //            var venta = new ERegistroVenta
+        //            {
+        //                IdFacturaElectronica = facturaGuardada.IdFacturaElectronica,
+        //                RucCliente = datosXml.ClienteRuc,
+        //                Periodo = datosXml.FechaEmision.ToString("yyyyMM"),
+        //                RSCliente = datosXml.ClienteRazonSocial,
+        //                TipoDoc = datosXml.TipoDocumento,
+        //                SerieDoc = datosXml.Serie,
+        //                NumDoc = datosXml.Numero,
+        //                FechaEmision = datosXml.FechaEmision,
+        //                FechaVencimiento = datosXml.FechaVencimiento,
+        //                TipCambio = datosXml.TipoCambio,
+        //                TipoDocCliente = datosXml.ClienteTipoDocumento,
+        //                Moneda = datosXml.Moneda,
+        //                SubTotal = datosXml.MontoBase,
+        //                ImpIgv = datosXml.MontoIgv,
+        //                TotalDoc = datosXml.MontoTotal,
+        //                EstadoDoc = "ACTIVO",
+        //                TipOperaSunat = datosXml.TipoOperacion,
+        //                CreatedAt = DateTime.UtcNow,
+        //                Detalles = new List<ERegistroVentaDetalle>()
+        //            };
 
-                    // 6. Agregar detalles
-                    foreach (var det in datosXml.Detalles)
-                    {
-                        venta.Detalles.Add(new ERegistroVentaDetalle
-                        {
-                            NumeroLinea = det.NumeroLinea,
-                            CodigoProducto = det.CodigoProducto,
-                            DescripcionProducto = det.Descripcion,
-                            UnidadMedida = det.UnidadMedida,
-                            Cantidad = det.Cantidad,
-                            PrecioUnitario = det.PrecioUnitario,
-                            PrecioUnitarioConIgv = det.PrecioUnitarioConIgv,
-                            ValorVenta = det.ValorVenta,
-                            MontoIgv = det.MontoIgv,
-                            TotalLinea = det.TotalLinea,
-                            TipoAfectacionIgv = det.TipoAfectacionIgv,
-                            PorcentajeIgv = 18.00m
-                        });
-                    }
+        //            // 6. Agregar detalles
+        //            foreach (var det in datosXml.Detalles)
+        //            {
+        //                venta.Detalles.Add(new ERegistroVentaDetalle
+        //                {
+        //                    NumeroLinea = det.NumeroLinea,
+        //                    CodigoProducto = det.CodigoProducto,
+        //                    DescripcionProducto = det.Descripcion,
+        //                    UnidadMedida = det.UnidadMedida,
+        //                    Cantidad = det.Cantidad,
+        //                    PrecioUnitario = det.PrecioUnitario,
+        //                    PrecioUnitarioConIgv = det.PrecioUnitarioConIgv,
+        //                    ValorVenta = det.ValorVenta,
+        //                    MontoIgv = det.MontoIgv,
+        //                    TotalLinea = det.TotalLinea,
+        //                    TipoAfectacionIgv = det.TipoAfectacionIgv,
+        //                    PorcentajeIgv = 18.00m
+        //                });
+        //            }
 
-                    // 7. Guardar venta con detalles
-                    var ventaGuardada = await _ventaRepository.CrearConDetallesAsync(venta);
+        //            // 7. Guardar venta con detalles
+        //            var ventaGuardada = await _ventaRepository.CrearConDetallesAsync(venta);
 
-                    resultado.Procesado = true;
-                    resultado.NumeroDocumento = datosXml.NumeroCompleto;
-                    resultado.IdVenta = ventaGuardada.IdRegVenta;
-                    resultado.IdFacturaElectronica = facturaGuardada.IdFacturaElectronica;
-                    response.VentasRegistradas++;
+        //            resultado.Procesado = true;
+        //            resultado.NumeroDocumento = datosXml.NumeroCompleto;
+        //            resultado.IdVenta = ventaGuardada.IdRegVenta;
+        //            resultado.IdFacturaElectronica = facturaGuardada.IdFacturaElectronica;
+        //            response.VentasRegistradas++;
 
-                    _logger.LogInformation(
-                        "Venta registrada: {NumeroDocumento}, ID: {IdVenta}",
-                        datosXml.NumeroCompleto, ventaGuardada.IdRegVenta
-                    );
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error procesando archivo {Archivo}", archivo.FileName);
-                    resultado.Procesado = false;
-                    resultado.Error = ex.Message;
-                }
+        //            _logger.LogInformation(
+        //                "Venta registrada: {NumeroDocumento}, ID: {IdVenta}",
+        //                datosXml.NumeroCompleto, ventaGuardada.IdRegVenta
+        //            );
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            _logger.LogError(ex, "Error procesando archivo {Archivo}", archivo.FileName);
+        //            resultado.Procesado = false;
+        //            resultado.Error = ex.Message;
+        //        }
 
-                response.Resultados.Add(resultado);
-            }
+        //        response.Resultados.Add(resultado);
+        //    }
 
-            response.Exito = response.VentasRegistradas > 0;
-            response.Mensaje = $"Se procesaron {response.VentasRegistradas} de {archivosXml.Count} documentos";
+        //    response.Exito = response.VentasRegistradas > 0;
+        //    response.Mensaje = $"Se procesaron {response.VentasRegistradas} de {archivosXml.Count} documentos";
 
-            return response;
-        }
+        //    return response;
+        //}
 
 
 
