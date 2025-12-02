@@ -106,7 +106,7 @@ builder.Services.AddCors(options =>
 });
 
 // ===== INYECCIÓN DE DEPENDENCIAS =====
-
+builder.Services.AddHttpContextAccessor(); 
 // Repositories
 builder.Services.AddScoped<IAuthRepository, UserRepository>();
 builder.Services.AddScoped<IVentaRepository, VentaRepository>(); // ? NUEVO
