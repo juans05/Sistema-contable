@@ -13,8 +13,8 @@ namespace SistemaContable.Domain.Models
         public string Numero { get; set; }
         public string NumeroCompleto { get; set; }
         public string TipoDocumento { get; set; }
-        public DateTime FechaEmision { get; set; }
-        public DateTime? FechaVencimiento { get; set; }
+        public string FechaEmision { get; set; }
+        public string? FechaVencimiento { get; set; }
         public string Moneda { get; set; }
         public decimal MontoBase { get; set; }
         public decimal MontoIgv { get; set; }
@@ -35,8 +35,8 @@ namespace SistemaContable.Domain.Models
         public string TipoDoc { get; set; }
         public string SerieDoc { get; set; }
         public string NumDoc { get; set; }
-        public DateTime FechaEmision { get; set; }
-        public DateTime? FechaVencimiento { get; set; }
+        public string FechaEmision { get; set; }
+        public string? FechaVencimiento { get; set; }
         public decimal TipCambio { get; set; }
         public string TipoDocCliente { get; set; }
         public string Moneda { get; set; }

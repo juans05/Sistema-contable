@@ -50,11 +50,14 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     p_xml_original = factura.XmlOriginal,
                     p_codigo_hash = factura.CodigoHash,
                     p_usuario_creacion = usuario,
+                    p_estado =1,
                     p_ruc_empresa = rucEmpresa
                 };
 
                 var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM \"suizaConta\".sp_insertar_factura_electronica(@p_serie, @p_numero, @p_numero_completo, @p_tipo_documento, @p_fecha_emision, @p_fecha_vencimiento, @p_moneda, @p_monto_base, @p_monto_igv, @p_monto_total, @p_xml_original, @p_codigo_hash, @p_usuario_creacion,@p_ruc_empresa)",
+                    "SELECT * FROM \"suizaConta\".sp_insertar_factura_electronica(@p_serie, @p_numero, @p_numero_completo, @p_tipo_documento, @p_fecha_emision, @p_fecha_vencimiento, @p_moneda," +
+                    "                                                             @p_monto_base, @p_monto_igv, @p_monto_total, @p_xml_original, " +
+                    "                                                             @p_codigo_hash, @p_usuario_creacion,@p_estado,@p_ruc_empresa)",
                     parameters,
                     commandTimeout: 30
                 );

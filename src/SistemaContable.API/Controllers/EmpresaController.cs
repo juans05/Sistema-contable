@@ -286,7 +286,6 @@ namespace SistemaContable.API.Controllers
                 var request = new EmpresaQueryRequest
                 {
                     UsuarioId = usuarioId,
-                    EsContador = true,
                     Activo = true,
                     PageNumber = pageNumber,
                     PageSize = pageSize
@@ -361,7 +360,7 @@ namespace SistemaContable.API.Controllers
                 var request = new EmpresaQueryRequest
                 {
                     UsuarioId = contadorId,
-                    EsContador = true,
+                   
                     Activo = true,
                     PageNumber = pageNumber,
                     Search = search,

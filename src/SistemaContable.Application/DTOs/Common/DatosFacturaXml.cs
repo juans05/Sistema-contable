@@ -12,8 +12,8 @@ namespace SistemaContable.Application.DTOs.Common
         public string Numero { get; set; }
         public string NumeroCompleto { get; set; }
         public string TipoDocumento { get; set; }
-        public DateTime FechaEmision { get; set; }
-        public DateTime? FechaVencimiento { get; set; }
+        public string FechaEmision { get; set; }
+        public string? FechaVencimiento { get; set; }
         public string Moneda { get; set; }
         public decimal MontoBase { get; set; }
         public decimal MontoIgv { get; set; }

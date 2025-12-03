@@ -28,4 +28,11 @@ namespace SistemaContable.Application.DTOs.Responses.Empresa
         public DateTime? UpdatedAt { get; set; }
         public ContadorInfoResponse? Contador { get; set; }
     }
+    public class SpEmpresaCrearResult
+    {
+        public Guid? Id { get; set; }
+        public bool Success { get; set; }
+        public string Message { get; set; }
+    }
+
 }

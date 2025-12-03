@@ -6,8 +6,10 @@ using SistemaContable.Application.DTOs.Common;
 using SistemaContable.Application.DTOs.Requests.Contadores;
 using SistemaContable.Application.DTOs.Requests.Empresa;
 using SistemaContable.Application.DTOs.Responses;
+using SistemaContable.Application.DTOs.Responses.Empresa;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Domain.Entities;
+using SistemaContable.Infrastructure.Models;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -179,49 +181,66 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             }
         }
 
-        public async Task<ApiResponseDto<Guid>> CrearAsync(CreateEmpresaRequest dto)
+        public async Task<ApiResponseDto<Guid>> CrearAsync(CreateEmpresaRequest empresa)
         {
             try
             {
                 await using var connection = new NpgsqlConnection(_connectionString);
                 await connection.OpenAsync();
 
-                var parameters = new
-                {
-                    p_razon_social = dto.RazonSocial,
-                    p_nombre_comercial = dto.NombreComercial,
-                    p_ruc = dto.Ruc,
-                    p_direccion = dto.Direccion,
-                    p_telefono = dto.Telefono,
-                    p_email = dto.Email,
-                    p_web = dto.Web,
-                    p_regimen_tributario = dto.RegimenTributario,
-                    p_tipo_contribuyente = dto.TipoContribuyente,
-                    p_fecha_constitucion = dto.FechaConstitucion,
-                    p_representante_legal = dto.RepresentanteLegal,
-                    p_dni_representante = dto.DniRepresentante,
-                    p_logo_url = dto.LogoUrl,
-                    p_config = (object?)null,
-                    p_contador_id = dto.ContadorId
-                };
 
-                var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
-                    @"SELECT * FROM ""suizaConta"".sp_empresa_crear(
-                    @p_razon_social, @p_nombre_comercial, @p_ruc, @p_direccion,
-                    @p_telefono, @p_email, @p_web, @p_regimen_tributario,
-                    @p_tipo_contribuyente, @p_fecha_constitucion, @p_representante_legal,
-                    @p_dni_representante, @p_logo_url, @p_config, @p_contador_id
-                )",
-                    parameters,
-                    commandType: CommandType.Text,
-                    commandTimeout: 30
-                );
+
+              
+                var result = await connection.QueryFirstOrDefaultAsync<SpEmpresaCrearResult>(
+                                 @"SELECT * FROM ""suizaConta"".sp_empresa_crear(
+                                    @p_razon_social, @p_nombre_comercial, @p_ruc, @p_direccion,
+                                    @p_telefono, @p_email, @p_web, @p_regimen_tributario,
+                                    @p_tipo_contribuyente, @p_fecha_constitucion,
+                                    @p_representante_legal, @p_dni_representante, @p_logo_url, @p_contador_id
+                                )",
+                                 new
+                                 {
+                                     p_razon_social = empresa.RazonSocial,
+                                     p_nombre_comercial = empresa.NombreComercial ?? string.Empty,
+                                     p_ruc = empresa.Ruc,
+                                     p_direccion = empresa.Direccion ?? string.Empty,
+                                     p_telefono = empresa.Telefono ?? string.Empty,
+                                     p_email = empresa.Email ?? string.Empty,
+                                     p_web = empresa.Web ?? string.Empty,
+                                     p_regimen_tributario = empresa.RegimenTributario ?? string.Empty,
+                                     p_tipo_contribuyente = empresa.TipoContribuyente ?? string.Empty,
+                                     p_fecha_constitucion = empresa.FechaConstitucion ?? (object)DBNull.Value, // ✅ CRÍTICO: .Date
+                                     p_representante_legal = empresa.RepresentanteLegal ?? string.Empty,
+                                     p_dni_representante = empresa.DniRepresentante ?? string.Empty,
+                                     p_logo_url = empresa.LogoUrl ?? (object)DBNull.Value,
+                                     p_contador_id = empresa.ContadorId ?? (object)DBNull.Value
+                                 },
+                                 commandTimeout: 30
+                             );
+
+                if (result == null)
+                {
+                    throw new Exception("El stored procedure no devolvió resultado");
+                }
+
+                if (!result.Success)
+                {
+                    _logger.LogWarning("Error al crear empresa: {Message}", result.Message);
+                    return new ApiResponseDto<Guid>
+                    {
+                        Success = false,
+                        Message = result.Message,
+                        Data = Guid.Empty
+                    };
+                }
+
+                _logger.LogInformation("Empresa creada exitosamente: {EmpresaId}", result.Id);
 
                 return new ApiResponseDto<Guid>
                 {
-                    Success = result.success,
-                    Message = result.message,
-                    Data = result.id
+                    Success = true,
+                    Message = result.Message,
+                    Data = result.Id.GetValueOrDefault()
                 };
             }
             catch (Exception ex)
@@ -269,7 +288,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 var parameters = new
                 {
                     p_usuario_id = empresaQueryRequest.UsuarioId,
-                    p_es_contador = empresaQueryRequest.EsContador,
+                    p_es_contador = false,
                     p_activo = empresaQueryRequest.Activo,
                     p_search = empresaQueryRequest.Search,
                     p_page_number = empresaQueryRequest.PageNumber,

@@ -123,7 +123,7 @@ namespace SistemaContable.Application.Services.Implementations
                     {
                         IdFacturaElectronica = idFacturaElectronica,
                         RucCliente = datosXml.ClienteRuc,
-                        Periodo = datosXml.FechaEmision.ToString("yyyyMM"),
+                        Periodo = datosXml.FechaEmision,
                         RsCliente = datosXml.ClienteRazonSocial,
                         TipoDoc = datosXml.TipoDocumento,
                         SerieDoc = datosXml.Serie,
@@ -349,7 +349,7 @@ namespace SistemaContable.Application.Services.Implementations
             {
                 NumeroCompleto = doc.Descendants(cbc + "ID").FirstOrDefault()?.Value,
                 TipoDocumento = doc.Descendants(cbc + "InvoiceTypeCode").FirstOrDefault()?.Value,
-                FechaEmision = DateTime.Parse(doc.Descendants(cbc + "IssueDate").FirstOrDefault()?.Value),
+                FechaEmision = doc.Descendants(cbc + "IssueDate").FirstOrDefault()?.Value,
                 Moneda = doc.Descendants(cbc + "DocumentCurrencyCode").FirstOrDefault()?.Value ?? "PEN",
                 MontoTotal = decimal.Parse(doc.Descendants(cbc + "PayableAmount").FirstOrDefault()?.Value ?? "0"),
                 MontoBase = decimal.Parse(doc.Descendants(cbc + "LineExtensionAmount").FirstOrDefault()?.Value ?? "0"),
@@ -373,7 +373,7 @@ namespace SistemaContable.Application.Services.Implementations
             // Fecha vencimiento
             var fechaVenc = doc.Descendants(cbc + "DueDate").FirstOrDefault()?.Value;
             if (!string.IsNullOrEmpty(fechaVenc))
-                datos.FechaVencimiento = DateTime.Parse(fechaVenc);
+                datos.FechaVencimiento = fechaVenc;
 
             // Cliente
             var cliente = doc.Descendants(cac + "AccountingCustomerParty").FirstOrDefault();

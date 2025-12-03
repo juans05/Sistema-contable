@@ -10,7 +10,6 @@ namespace SistemaContable.Application.DTOs.Requests.Empresa
     public class EmpresaQueryRequest
     {
         public int? UsuarioId { get; set; }
-        public bool? EsContador { get; set; }
         public bool? Activo { get; set; }
 
         [StringLength(255)]

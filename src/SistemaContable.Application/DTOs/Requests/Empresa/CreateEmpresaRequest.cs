@@ -34,7 +34,6 @@ namespace SistemaContable.Application.DTOs.Requests.Empresa
         public string? Email { get; set; }
 
         [StringLength(255)]
-        [Url(ErrorMessage = "La URL del sitio web no es válida")]
         public string? Web { get; set; }
 
         [StringLength(50)]
@@ -43,7 +42,7 @@ namespace SistemaContable.Application.DTOs.Requests.Empresa
         [StringLength(50)]
         public string? TipoContribuyente { get; set; }
 
-        public DateTime? FechaConstitucion { get; set; }
+        public string? FechaConstitucion { get; set; }
 
         [StringLength(255)]
         public string? RepresentanteLegal { get; set; }
@@ -53,7 +52,6 @@ namespace SistemaContable.Application.DTOs.Requests.Empresa
         public string? DniRepresentante { get; set; }
 
         [StringLength(500)]
-        [Url(ErrorMessage = "La URL del logo no es válida")]
         public string? LogoUrl { get; set; }
 
         //public EmpresaConfigDto? Config { get; set; }

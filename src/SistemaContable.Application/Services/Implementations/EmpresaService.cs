@@ -71,7 +71,7 @@ namespace SistemaContable.Application.Services.Implementations
                 }
 
                 // Verificar si el estado ya es el mismo
-                if (empresaExistente.Activo == request.Activo)
+                if (empresaExistente.activo == request.Activo)
                 {
                     var estadoActual = request.Activo ? "activada" : "desactivada";
                     return new CambiarEstadoResponse
