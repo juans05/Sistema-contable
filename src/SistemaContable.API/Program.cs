@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+Ôªøusing Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SistemaContable.API.Middlewares;
@@ -11,9 +11,10 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
 
-
-// Swagger con JWT
+// ===== SWAGGER - CONFIGURACI√ìN √öNICA =====
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
@@ -23,7 +24,7 @@ builder.Services.AddSwaggerGen(c =>
         Description = "API para Sistema Contable Multi-Tenant"
     });
 
-    // ConfiguraciÛn de JWT en Swagger
+    // Configuraci√≥n de JWT en Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header usando el esquema Bearer. Ejemplo: 'Bearer {token}'",
@@ -70,31 +71,13 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-        ClockSkew = TimeSpan.Zero // Elimina el tiempo de gracia de 5 minutos por defecto
-    };
-
-    // Eventos para debugging (opcional)
-    options.Events = new JwtBearerEvents
-    {
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine($"Token inv·lido: {context.Exception.Message}");
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            Console.WriteLine($"Token v·lido para: {context.Principal?.Identity?.Name}");
-            return Task.CompletedTask;
-        }
+        ClockSkew = TimeSpan.Zero
     };
 });
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(); 
 builder.Services.AddAuthorization();
 
-// CORS (ajustar seg˙n necesidad)
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -105,37 +88,46 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ===== INYECCI”N DE DEPENDENCIAS =====
-builder.Services.AddHttpContextAccessor(); 
+// ===== INYECCI√ìN DE DEPENDENCIAS =====
+builder.Services.AddHttpContextAccessor(); // ‚≠ê AGREGADO
+
 // Repositories
 builder.Services.AddScoped<IAuthRepository, UserRepository>();
-builder.Services.AddScoped<IVentaRepository, VentaRepository>(); // ? NUEVO
-builder.Services.AddScoped<IFacturaElectronicaRepository, FacturaElectronicaRepository>(); // ? NUEVO
-
+builder.Services.AddScoped<IVentaRepository, VentaRepository>();
+builder.Services.AddScoped<IFacturaElectronicaRepository, FacturaElectronicaRepository>();
+builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
 // Services
 builder.Services.AddSingleton<IPasswordService, PasswordService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVentaElectronicaService, VentaElectronicaService>();
 builder.Services.AddScoped<IRucEmpresaService, RucEmpresaService>();
+builder.Services.AddScoped<IEmpresaService, EmpresaService>();
+
 var app = builder.Build();
 
-app.UseMiddleware<RucEmpresaMiddleware>();
-// ===== CONFIGURACI”N DEL PIPELINE =====
-app.UseSwagger();
+// ===== CONFIGURACI√ìN DEL PIPELINE =====
 
-app.UseSwaggerUI(c =>
+// Swagger solo en Development (opcional, pero recomendado)
+if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "QA")
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Sistema Contable API v1");
-    c.RoutePrefix = string.Empty; // Swagger en la raÌz
-});
-app.UseHttpsRedirection();
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Sistema Contable API v1");
+        c.RoutePrefix = string.Empty; // Swagger en la ra√≠z
+    });
+}
 
+app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 
-// IMPORTANTE: El orden es crucial
-app.UseAuthentication(); // Primero autenticaciÛn
-app.UseAuthorization();  // Luego autorizaciÛn
+// Middleware personalizado
+app.UseMiddleware<RucEmpresaMiddleware>();
+
+// Autenticaci√≥n y autorizaci√≥n
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 
