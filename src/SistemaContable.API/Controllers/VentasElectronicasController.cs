@@ -46,7 +46,7 @@ namespace SistemaContable.API.Controllers
                 var userId = int.Parse(userIdClaim);
 
                 // Extraer EmpresaId del token o del query parameter
-                var empresaIdClaim = User.FindFirst("Ruc")?.Value;
+                var empresaIdClaim = User.FindFirst("RUC")?.Value;
                 Guid currentEmpresaId;
                 if (archivos == null || !archivos.Any())
                     return BadRequest(new { mensaje = "Debe enviar al menos un archivo XML" });
@@ -73,7 +73,7 @@ namespace SistemaContable.API.Controllers
                     });
 
                 var usuario = User.Identity?.Name ?? "SYSTEM";
-                var resultado = await _service.ProcesarXmlYRegistrarVentaAsync(archivos, usuario, _RucEmpresa);
+                var resultado = await _service.ProcesarXmlYRegistrarVentaAsync(archivos, usuario, (_RucEmpresa == null) ? empresaIdClaim : _RucEmpresa);
 
                 return Ok(resultado);
             }

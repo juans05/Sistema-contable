@@ -5,6 +5,7 @@ using SistemaContable.Application.DTOs.Common;
 using SistemaContable.Application.DTOs.Responses.XML;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
+using SistemaContable.Common.Helpers;
 using SistemaContable.Domain.Entities;
 using SistemaContable.Domain.Models;
 using System;
@@ -12,6 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -51,7 +53,40 @@ namespace SistemaContable.Application.Services.Implementations
         {
             return await _facturaRepository.ObtenerVentaCompletaAsync(idRegVenta);
         }
+        private string NormalizarXml(string xml)
+        {
+            if (string.IsNullOrEmpty(xml))
+                return xml;
 
+            try
+            {
+                // 1. Asegurar que esté en UTF-8
+                var bytes = Encoding.UTF8.GetBytes(xml);
+                xml = Encoding.UTF8.GetString(bytes);
+
+                // 2. Corregir declaración XML si es necesario
+                if (!xml.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase))
+                {
+                    xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + xml;
+                }
+
+                // 3. Remover caracteres de control inválidos
+                xml = System.Text.RegularExpressions.Regex.Replace(
+                    xml,
+                    @"[\x00-\x08\x0B\x0C\x0E-\x1F]",
+                    string.Empty
+                );
+
+                // 4. Validar que sea XML válido
+                var doc = System.Xml.Linq.XDocument.Parse(xml);
+                return doc.ToString(System.Xml.Linq.SaveOptions.DisableFormatting);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "No se pudo normalizar XML, usando original");
+                return xml;
+            }
+        }
         public async Task<ProcesarXmlResponseDto> ProcesarXmlYRegistrarVentaAsync(List<IFormFile> archivosXml, string usuario, string ruc)
         {
             var response = new ProcesarXmlResponseDto
@@ -85,7 +120,7 @@ namespace SistemaContable.Application.Services.Implementations
                     }
 
                     // 4. Parsear XML
-                    var datosXml = ParsearFacturaXml(xmlContent);
+                    var datosXml = ParsearFacturaXml(NormalizarXml(xmlContent));
 
                     // 5. Insertar factura electrónica
                     var facturaDto = new FacturaElectronicaDto
@@ -100,7 +135,7 @@ namespace SistemaContable.Application.Services.Implementations
                         MontoBase = datosXml.MontoBase,
                         MontoIgv = datosXml.MontoIgv,
                         MontoTotal = datosXml.MontoTotal,
-                        XmlOriginal = xmlContent,
+                        XmlOriginal = XmlCompressor.Compress(LimpiarXml(NormalizarXml(xmlContent))),
                         CodigoHash = hash,
                         RucEmpresa = ruc
                     };
@@ -202,7 +237,18 @@ namespace SistemaContable.Application.Services.Implementations
 
             return response;
         }
+        public static string LimpiarXml(string xml)
+        {
+            if (string.IsNullOrEmpty(xml)) return xml;
 
+            // Remover caracteres de control problemáticos
+            xml = Regex.Replace(xml, @"[\x00-\x08\x0B\x0C\x0E-\x1F]", "");
+
+            // Normalizar espacios
+            xml = Regex.Replace(xml, @"\s+", " ");
+
+            return xml.Trim();
+        }
         //public async Task<ProcesarXmlVentaResponseDto> ProcesarXmlYRegistrarVentaAsync(List<IFormFile> archivosXml, string usuario, ResultadoProcesamiento resultado)
         //{
         //    var response = new ProcesarXmlVentaResponseDto

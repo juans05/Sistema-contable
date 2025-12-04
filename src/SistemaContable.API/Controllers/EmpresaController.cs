@@ -131,7 +131,7 @@ namespace SistemaContable.API.Controllers
         {
             try
             {
-                if (id != request.Id)
+                if (id != request.id)
                 {
                     return BadRequest(new { message = "El ID de la URL no coincide con el ID del body" });
                 }

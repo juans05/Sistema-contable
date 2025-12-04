@@ -8,10 +8,16 @@ using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Infrastructure.Data.Repositories.Implementations;
 using SistemaContable.Infrastructurxe.Data.Repositories.Implementations;
 using System.Text;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 // ===== SWAGGER - CONFIGURACIÓN ÚNICA =====

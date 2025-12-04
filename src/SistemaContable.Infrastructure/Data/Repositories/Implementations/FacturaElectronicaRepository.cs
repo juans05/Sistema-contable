@@ -107,7 +107,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
                 var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
                     "SELECT * FROM \"suizaConta\".sp_insertar_registro_venta(@p_id_factura_electronica, @p_ruc_cliente, @p_periodo, @p_rs_cliente, @p_tipo_doc, @p_serie_doc, @p_num_doc," +
-                    " @p_fecha_emision, @p_fecha_vencimiento, @p_tip_cambio, @p_tipo_doc_cliente, @p_moneda, @p_sub_total, @p_imp_igv, @p_total_doc, @p_tip_opera_sunat, @p_usuario_creacion,@p_estado, @p_rucempresa)",
+                    " @p_fecha_emision, @p_fecha_vencimiento, @p_tip_cambio, @p_tipo_doc_cliente, @p_moneda, @p_sub_total, @p_imp_igv, @p_total_doc, @p_tip_opera_sunat, @p_usuario_creacion,@p_estado, @p_ruc_empresa)",
                     parameters,
                     commandTimeout: 30
                 );

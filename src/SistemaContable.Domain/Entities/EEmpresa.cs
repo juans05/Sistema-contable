@@ -8,24 +8,23 @@ namespace SistemaContable.Domain.Entities
 {
     public class EEmpresa
     {
-        public Guid Id { get; set; }
-        public string razon_social { get; set; } = string.Empty;
-        public string nombre_comercial { get; set; } = string.Empty;
-        public string Ruc { get; set; } = string.Empty;
-        public string? Direccion { get; set; }
-        public string? Telefono { get; set; }
-        public string? Email { get; set; }
-        public string? Web { get; set; }
-        public string? regimen_tributario { get; set; }
-        public string? tipo_contribuyente { get; set; }
-        public DateTime? FechaConstitucion { get; set; }
-        public string? representante_legal { get; set; }
-        public string? dni_representante { get; set; }
-        public string? logo_url { get; set; }
+        public Guid id { get; set; }
+        public string razonSocial { get; set; } = string.Empty;
+        public string nombreComercial { get; set; } = string.Empty;
+        public string ruc { get; set; } = string.Empty;
+        public string? direccion { get; set; }
+        public string? telefono { get; set; }
+        public string? email { get; set; }
+        public string? web { get; set; }
+        public string? regimenTributario { get; set; }
+        public string? tipoContribuyente { get; set; }
+        public DateTime? fechaConstitucion { get; set; }
+        public string? representanteLegal { get; set; }
+        public string? dniRepresentante { get; set; }
+        public string? logoUrl { get; set; }
         public bool activo { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? UpdatedAt { get; set; }
-
-        public ICollection<EEmpresaUsuario> EmpresaUsuarios { get; set; } = new List<EEmpresaUsuario>();
+        public DateTime createdAt { get; set; }
+        public DateTime? updatedAt { get; set; }
+        public ICollection<EEmpresaUsuario> empresaUsuarios { get; set; } = new List<EEmpresaUsuario>();
     }
 }

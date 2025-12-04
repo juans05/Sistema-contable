@@ -36,7 +36,7 @@
         {
             // Si usas JWT, extrae el RUC del token
             var user = context.User;
-            return user?.Claims.FirstOrDefault(c => c.Type == "ruc_empresa")?.Value;
+            return user?.Claims.FirstOrDefault(c => c.Type == "RUC")?.Value;
         }
     }
 }

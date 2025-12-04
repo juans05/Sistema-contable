@@ -33,14 +33,14 @@ namespace SistemaContable.Application.Services.Implementations
             }
 
             // Intentar obtener de Items
-            if (httpContext.Items.TryGetValue("RucEmpresa", out var ruc))
+            if (httpContext.Items.TryGetValue("RUC", out var ruc))
             {
                 return ruc?.ToString();
             }
 
             // Fallback: intentar desde Claims
             var rucFromClaims = httpContext.User?.Claims
-                .FirstOrDefault(c => c.Type == "ruc_empresa")?.Value;
+                .FirstOrDefault(c => c.Type == "RUC")?.Value;
 
             if (!string.IsNullOrEmpty(rucFromClaims))
             {
@@ -56,7 +56,7 @@ namespace SistemaContable.Application.Services.Implementations
             var httpContext = _httpContextAccessor.HttpContext;
             if (httpContext != null)
             {
-                httpContext.Items["RucEmpresa"] = ruc;
+                httpContext.Items["RUC"] = ruc;
                 _logger.LogInformation($"RUC establecido manualmente: {ruc}");
             }
         }

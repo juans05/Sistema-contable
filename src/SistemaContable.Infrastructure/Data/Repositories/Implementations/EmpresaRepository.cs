@@ -42,20 +42,20 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
                 var parameters = new
                 {
-                    p_id = dto.Id,
-                    p_razon_social = dto.RazonSocial,
-                    p_nombre_comercial = dto.NombreComercial,
-                    p_ruc = dto.Ruc,
-                    p_direccion = dto.Direccion,
-                    p_telefono = dto.Telefono,
-                    p_email = dto.Email,
-                    p_web = dto.Web,
-                    p_regimen_tributario = dto.RegimenTributario,
-                    p_tipo_contribuyente = dto.TipoContribuyente,
-                    p_fecha_constitucion = dto.FechaConstitucion,
-                    p_representante_legal = dto.RepresentanteLegal,
-                    p_dni_representante = dto.DniRepresentante,
-                    p_logo_url = dto.LogoUrl,
+                    p_id = dto.id,
+                    p_razon_social = dto.razonSocial,
+                    p_nombre_comercial = dto.nombreComercial,
+                    p_ruc = dto.ruc,
+                    p_direccion = dto.direccion,
+                    p_telefono = dto.telefono,
+                    p_email = dto.email,
+                    p_web = dto.web,
+                    p_regimen_tributario = dto.regimenTributario,
+                    p_tipo_contribuyente = dto.tipoContribuyente,
+                    p_fecha_constitucion = dto.fechaConstitucion,
+                    p_representante_legal = dto.representanteLegal,
+                    p_dni_representante = dto.dniRepresentante,
+                    p_logo_url = dto.logoUrl,
                     p_config = (object?)null
                 };
 
@@ -80,7 +80,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al actualizar empresa {EmpresaId}", dto.Id);
+                _logger.LogError(ex, "Error al actualizar empresa {EmpresaId}", dto.id);
                 throw;
             }
         }
@@ -200,20 +200,20 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                                 )",
                                  new
                                  {
-                                     p_razon_social = empresa.RazonSocial,
-                                     p_nombre_comercial = empresa.NombreComercial ?? string.Empty,
-                                     p_ruc = empresa.Ruc,
-                                     p_direccion = empresa.Direccion ?? string.Empty,
-                                     p_telefono = empresa.Telefono ?? string.Empty,
-                                     p_email = empresa.Email ?? string.Empty,
-                                     p_web = empresa.Web ?? string.Empty,
-                                     p_regimen_tributario = empresa.RegimenTributario ?? string.Empty,
-                                     p_tipo_contribuyente = empresa.TipoContribuyente ?? string.Empty,
-                                     p_fecha_constitucion = empresa.FechaConstitucion ?? (object)DBNull.Value, // ✅ CRÍTICO: .Date
-                                     p_representante_legal = empresa.RepresentanteLegal ?? string.Empty,
-                                     p_dni_representante = empresa.DniRepresentante ?? string.Empty,
-                                     p_logo_url = empresa.LogoUrl ?? (object)DBNull.Value,
-                                     p_contador_id = empresa.ContadorId ?? (object)DBNull.Value
+                                     p_razon_social = empresa.razonSocial,
+                                     p_nombre_comercial = empresa.nombreComercial ?? string.Empty,
+                                     p_ruc = empresa.ruc,
+                                     p_direccion = empresa.direccion ?? string.Empty,
+                                     p_telefono = empresa.telefono ?? string.Empty,
+                                     p_email = empresa.email ?? string.Empty,
+                                     p_web = empresa.web ?? string.Empty,
+                                     p_regimen_tributario = empresa.regimenTributario ?? string.Empty,
+                                     p_tipo_contribuyente = empresa.tipoContribuyente ?? string.Empty,
+                                     p_fecha_constitucion = empresa.fechaConstitucion ?? (object)DBNull.Value, // ✅ CRÍTICO: .Date
+                                     p_representante_legal = empresa.representanteLegal ?? string.Empty,
+                                     p_dni_representante = empresa.dniRepresentante ?? string.Empty,
+                                     p_logo_url = empresa.logoUrl ?? (object)DBNull.Value,
+                                     p_contador_id = empresa.contadorId ?? (object)DBNull.Value
                                  },
                                  commandTimeout: 30
                              );

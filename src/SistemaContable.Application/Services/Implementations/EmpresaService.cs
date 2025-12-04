@@ -34,7 +34,7 @@ namespace SistemaContable.Application.Services.Implementations
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error en ActualizarEmpresaAsync para {EmpresaId}", dto.Id);
+                _logger.LogError(ex, "Error en ActualizarEmpresaAsync para {EmpresaId}", dto.id);
                 throw;
             }
         }
