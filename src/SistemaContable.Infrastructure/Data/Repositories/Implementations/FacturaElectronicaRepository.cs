@@ -81,12 +81,12 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             {
                 await using var connection = new NpgsqlConnection(_connectionString);
                 await connection.OpenAsync();
-
+                var fecha = DateTime.Parse(venta.Periodo);
                 var parameters = new
                 {
                     p_id_factura_electronica = venta.IdFacturaElectronica,
                     p_ruc_cliente = venta.RucCliente,
-                    p_periodo = venta.Periodo,
+                    p_periodo = fecha.ToString("yyyyMM"),
                     p_rs_cliente = venta.RsCliente,
                     p_tipo_doc = venta.TipoDoc,
                     p_serie_doc = venta.SerieDoc,
@@ -114,7 +114,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
                 return result ?? new SpResultado { OMensaje = "Error: No se obtuvo respuesta del SP" };
             }
-            catch (Exception ex)
+                catch (Exception ex)
             {
                 _logger.LogError(ex, "Error insertando registro de venta");
                 return new SpResultado
@@ -132,7 +132,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             {
                 await using var connection = new NpgsqlConnection(_connectionString);
                 await connection.OpenAsync();
-
+                    
                 var parameters = new
                 {
                     p_id_reg_venta = idRegVenta,
@@ -194,7 +194,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 await connection.OpenAsync();
 
                 var ventaData = await connection.QueryAsync<VentaCompletaRaw>(
-                    "SELECT * FROM sp_obtener_venta_completa(@p_id_reg_venta)",
+                    "SELECT * FROM \"suizaConta\".sp_obtener_venta_completa(@p_id_reg_venta)",
                     new { p_id_reg_venta = idRegVenta },
                     commandTimeout: 30
                 );

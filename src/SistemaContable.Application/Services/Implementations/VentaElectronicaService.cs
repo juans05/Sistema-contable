@@ -175,8 +175,7 @@ namespace SistemaContable.Application.Services.Implementations
                         RucEmpresa = ruc
                     };
 
-                    var resultadoVenta = await _facturaRepository.InsertarRegistroVentaAsync(
-                        ventaDto, usuario,ruc,1);
+                    var resultadoVenta = await _facturaRepository.InsertarRegistroVentaAsync(ventaDto, usuario,ruc,1);
 
                     if (resultadoVenta.OExisteDuplicado || !resultadoVenta.OIdRegVenta.HasValue)
                     {
