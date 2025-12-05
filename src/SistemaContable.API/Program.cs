@@ -102,6 +102,7 @@ builder.Services.AddScoped<IAuthRepository, UserRepository>();
 builder.Services.AddScoped<IVentaRepository, VentaRepository>();
 builder.Services.AddScoped<IFacturaElectronicaRepository, FacturaElectronicaRepository>();
 builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
+builder.Services.AddScoped<ICompraRepository, CompraRepository>();
 // Services
 builder.Services.AddSingleton<IPasswordService, PasswordService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
@@ -109,6 +110,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVentaElectronicaService, VentaElectronicaService>();
 builder.Services.AddScoped<IRucEmpresaService, RucEmpresaService>();
 builder.Services.AddScoped<IEmpresaService, EmpresaService>();
+builder.Services.AddScoped<ICompraService, CompraService>();
 
 var app = builder.Build();
 

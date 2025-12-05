@@ -10,6 +10,7 @@ namespace SistemaContable.Domain.Models
     {
         public int? OIdFactura { get; set; }
         public int? OIdRegVenta { get; set; }
+        public int? OIdRegCompra { get; set; }
         public int? OIdDetalle { get; set; }
         public bool OExisteDuplicado { get; set; }
         public bool OAnulado { get; set; }
