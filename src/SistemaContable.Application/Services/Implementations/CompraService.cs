@@ -109,6 +109,7 @@ namespace SistemaContable.Application.Services.Implementations
                         ImpIgv = datosXml.MontoIgv,
                         TotalDoc = datosXml.MontoTotal,
                         TipOperaSunat = datosXml.TipoOperacion,
+                        estadoDocumento = 1
                     };
 
                     var resultadoCompra = await _compraRepository.InsertarRegistroCompraAsync(compraDto, usuario);
