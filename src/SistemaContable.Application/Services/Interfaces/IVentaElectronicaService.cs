@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using SistemaContable.Application.DTOs.Responses.Venta;
 using SistemaContable.Application.DTOs.Responses.XML;
 using SistemaContable.Domain.Models;
 using System;
@@ -15,8 +16,9 @@ namespace SistemaContable.Application.Services.Interfaces
            List<IFormFile> archivosXml, string usuario, string rucEmpresa);
         Task<VentaCompletaDto> ObtenerVentaPorIdAsync(int idRegVenta);
         Task<List<VentaListaDto>> ListarVentasAsync(
-            DateTime fechaDesde, DateTime fechaHasta,
+            string fechaDesde, string fechaHasta,
             string rucCliente = null, string tipoDoc = null,
             string estadoDoc = null, string _RucEmpresa = null);
+        Task<AnularVentaResponseDTO> AnularVentaAsync(int idRegVenta, string motivo, string usuario);
     }
 }

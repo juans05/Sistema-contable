@@ -56,8 +56,8 @@ namespace SistemaContable.UnitTests.Controllers
                 TotalRecords = 2,
                 Data = new List<EEmpresa>
                 {
-                    new() { NombreComercial = "Empresa 1", Ruc = "20123456789" },
-                    new() { NombreComercial = "Empresa 2", Ruc = "20987654321" }
+                    new() { nombreComercial = "Empresa 1", ruc = "20123456789" },
+                    new() { nombreComercial = "Empresa 2", ruc = "20987654321" }
                 }
             };
 
@@ -113,7 +113,7 @@ namespace SistemaContable.UnitTests.Controllers
                 TotalRecords = 1,
                 Data = new List<EEmpresa>
                 {
-                    new() { NombreComercial = "Test Empresa", Ruc = "20123456789" }
+                    new() { nombreComercial = "Test Empresa", ruc = "20123456789" }
                 }
             };
 
@@ -141,9 +141,9 @@ namespace SistemaContable.UnitTests.Controllers
             var empresaId = Guid.NewGuid();
             var expectedResponse = new EEmpresa
             {
-                Id = empresaId,
-                NombreComercial = "Test Empresa",
-                Ruc = "20123456789"
+                id = empresaId,
+                nombreComercial = "Test Empresa",
+                ruc = "20123456789"
             };
 
             _mockService
@@ -189,9 +189,9 @@ namespace SistemaContable.UnitTests.Controllers
             // Arrange
             var request = new CreateEmpresaRequest
             {
-                RazonSocial = "Nueva Empresa S.A.C.",
-                NombreComercial = "Nueva",
-                Ruc = "20123456789"
+                razonSocial = "Nueva Empresa S.A.C.",
+                nombreComercial = "Nueva",
+                ruc = "20123456789"
             };
 
             var empresaId = Guid.NewGuid();
@@ -245,9 +245,9 @@ namespace SistemaContable.UnitTests.Controllers
             // Arrange
             var request = new CreateEmpresaRequest
             {
-                RazonSocial = "Test",
-                NombreComercial = "Test",
-                Ruc = "20123456789"
+                razonSocial = "Test",
+                nombreComercial = "Test",
+                ruc = "20123456789"
             };
             var empresaId = Guid.NewGuid();
 
@@ -276,9 +276,9 @@ namespace SistemaContable.UnitTests.Controllers
             // Arrange
             var request = new CreateEmpresaRequest
             {
-                RazonSocial = "Test",
-                NombreComercial = "Test",
-                Ruc = "20123456789"
+                razonSocial = "Test",
+                nombreComercial = "Test",
+                ruc = "20123456789"
             };
 
             _mockService
@@ -303,10 +303,10 @@ namespace SistemaContable.UnitTests.Controllers
             var empresaId = Guid.NewGuid();
             var request = new UpdateEmpresaRequest
             {
-                Id = empresaId,
-                RazonSocial = "Actualizada",
-                NombreComercial = "Actualizada",
-                Ruc = "20123456789"
+                id = empresaId,
+                razonSocial = "Actualizada",
+                nombreComercial = "Actualizada",
+                ruc = "20123456789"
             };
 
             // ✅ Crear ApiResponseDto<bool> en lugar de solo bool
@@ -351,10 +351,10 @@ namespace SistemaContable.UnitTests.Controllers
             var empresaId = Guid.NewGuid();
             var request = new UpdateEmpresaRequest
             {
-                Id = Guid.NewGuid(),
-                RazonSocial = "Test",
-                NombreComercial = "Test",
-                Ruc = "20123456789"
+                id = Guid.NewGuid(),
+                razonSocial = "Test",
+                nombreComercial = "Test",
+                ruc = "20123456789"
             };
 
             // Act
@@ -369,7 +369,7 @@ namespace SistemaContable.UnitTests.Controllers
         {
             // Arrange
             var empresaId = Guid.NewGuid();
-            var request = new UpdateEmpresaRequest { Id = empresaId };
+            var request = new UpdateEmpresaRequest { id = empresaId };
             _controller.ModelState.AddModelError("RazonSocial", "Required");
 
             // Act
@@ -386,10 +386,10 @@ namespace SistemaContable.UnitTests.Controllers
             var empresaId = Guid.NewGuid();
             var request = new UpdateEmpresaRequest
             {
-                Id = empresaId,
-                RazonSocial = "Test",
-                NombreComercial = "Test",
-                Ruc = "20123456789"
+                id = empresaId,
+                razonSocial = "Test",
+                nombreComercial = "Test",
+                ruc = "20123456789"
             };
 
             var expectedResponse = new ApiResponseDto<bool>
@@ -512,10 +512,10 @@ namespace SistemaContable.UnitTests.Controllers
             var empresaId = Guid.NewGuid();
             var request = new UpdateEmpresaRequest
             {
-                Id = empresaId,
-                RazonSocial = "Test",
-                NombreComercial = "Test",
-                Ruc = "20123456789"
+                id = empresaId,
+                razonSocial = "Test",
+                nombreComercial = "Test",
+                ruc = "20123456789"
             };
 
             var expectedResponse = new ApiResponseDto<bool>
@@ -666,7 +666,7 @@ namespace SistemaContable.UnitTests.Controllers
                 TotalRecords = 1,
                 Data = new List<EEmpresa>
                 {
-                    new() { NombreComercial = "Mi Empresa esta actualizar " }
+                    new() { nombreComercial = "Mi Empresa esta actualizar " }
                 }
             };
 

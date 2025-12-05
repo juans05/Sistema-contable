@@ -239,7 +239,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         }
 
         public async Task<List<VentaListaDto>> ListarVentasAsync(
-            DateTime fechaDesde, DateTime fechaHasta,
+            string fechaDesde, string fechaHasta,
             string rucCliente = null, string tipoDoc = null,
             string estadoDoc = null, string _RucEmpresa = null, int limite = 100, int offset = 0)
         {
@@ -250,8 +250,8 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
                 var parameters = new
                 {
-                    p_fecha_desde = fechaDesde.Date,
-                    p_fecha_hasta = fechaHasta.Date,
+                    p_fecha_desde = fechaDesde,
+                    p_fecha_hasta = fechaHasta,
                     p_ruc_cliente = rucCliente,
                     p_tipo_doc = tipoDoc,
                     p_estado_doc = estadoDoc,
@@ -336,7 +336,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 await connection.OpenAsync();
 
                 var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM sp_anular_venta(@p_id_reg_venta, @p_motivo, @p_usuario)",
+                    @"SELECT * FROM ""suizaConta"".sp_anular_venta(@p_id_reg_venta, @p_motivo, @p_usuario)",
                     new
                     {
                         p_id_reg_venta = idRegVenta,

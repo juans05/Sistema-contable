@@ -15,7 +15,7 @@ namespace SistemaContable.Application.Services.Interfaces.IRepository
         Task<bool> VerificarDuplicadoHashAsync(string hash);
         Task<VentaCompletaDto> ObtenerVentaCompletaAsync(int idRegVenta);
         Task<List<VentaListaDto>> ListarVentasAsync(
-            DateTime fechaDesde, DateTime fechaHasta,
+            string fechaDesde, string fechaHasta,
             string rucCliente = null, string tipoDoc = null,
             string estadoDoc = null, string _RucEmpresa = null, int limite = 100, int offset = 0);
         Task<SpResultado> ActualizarEstadoSunatAsync(

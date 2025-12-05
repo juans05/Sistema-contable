@@ -47,21 +47,21 @@ namespace SistemaContable.UnitTests
                     {
                         new EEmpresa
                         {
-                            Id = Guid.NewGuid(),
-                            NombreComercial = "Empresa 1",
-                            Ruc = "12345678901",
-                            RazonSocial = "Empresa 1 S.A.C.",
-                            Activo = true,
-                            CreatedAt = DateTime.UtcNow
+                            id = Guid.NewGuid(),
+                            nombreComercial = "Empresa 1",
+                            ruc = "12345678901",
+                            razonSocial = "Empresa 1 S.A.C.",
+                            activo = true,
+                            createdAt = DateTime.UtcNow
                         },
                         new EEmpresa
                         {
-                            Id = Guid.NewGuid(),
-                            NombreComercial = "Empresa 2",
-                            Ruc = "98765432109",
-                            RazonSocial = "Empresa 2 S.A.C.",
-                            Activo = true,
-                            CreatedAt = DateTime.UtcNow
+                            id = Guid.NewGuid(),
+                            nombreComercial = "Empresa 2",
+                            ruc = "98765432109",
+                            razonSocial = "Empresa 2 S.A.C.",
+                            activo = true,
+                            createdAt = DateTime.UtcNow
                         }
                     }
             };           

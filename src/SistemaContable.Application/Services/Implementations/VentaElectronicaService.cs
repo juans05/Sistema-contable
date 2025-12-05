@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using SistemaContable.Application.DTOs;
 using SistemaContable.Application.DTOs.Common;
+using SistemaContable.Application.DTOs.Responses.Venta;
 using SistemaContable.Application.DTOs.Responses.XML;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
@@ -34,7 +35,7 @@ namespace SistemaContable.Application.Services.Implementations
             _logger = logger;
         }
 
-        public async Task<List<VentaListaDto>> ListarVentasAsync(DateTime fechaDesde, DateTime fechaHasta, string rucCliente = null,
+        public async Task<List<VentaListaDto>> ListarVentasAsync(string fechaDesde, string fechaHasta, string rucCliente = null,
                                                                  string tipoDoc = null, string estadoDoc = null,string _RucEmpresa = null)
         {
             try
@@ -465,6 +466,26 @@ namespace SistemaContable.Application.Services.Implementations
             return datos;  
         }
 
-     
+        public async Task<AnularVentaResponseDTO> AnularVentaAsync(int idRegVenta, string motivo, string usuario)
+        {
+            var response = new AnularVentaResponseDTO();
+
+            try
+            {
+                var result = await _facturaRepository.AnularVentaAsync(idRegVenta, motivo, usuario);
+
+                response.Anulado = result.OAnulado;
+                response.Message = result.OMensaje;
+
+            }
+            catch (Exception ex)
+            {
+                response.Anulado = false;
+                response.Message = ex.Message;
+                _logger.LogError(ex, "Error anulando venta ID: {IdRegVenta}", idRegVenta);
+            }
+
+            return response;
+        }
     }
 }

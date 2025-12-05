@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SistemaContable.Application.DTOs.Requests.Venta;
+using SistemaContable.Application.DTOs.Responses.Venta;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Domain.Models;
 using System.Security.Claims;
@@ -118,8 +120,8 @@ namespace SistemaContable.API.Controllers
         [HttpGet]
         [ProducesResponseType(typeof(List<VentaListaDto>), 200)]
         public async Task<ActionResult<List<VentaListaDto>>> ListarVentas(
-            [FromQuery] DateTime fechaDesde,
-            [FromQuery] DateTime fechaHasta,
+            [FromQuery] string fechaDesde,
+            [FromQuery] string fechaHasta,
             [FromQuery] string rucCliente = null,
             [FromQuery] string tipoDoc = null,
             [FromQuery] string estadoDoc = null)
@@ -141,6 +143,23 @@ namespace SistemaContable.API.Controllers
             {
                 _logger.LogError(ex, "Error listando ventas");
                 return StatusCode(500, new { mensaje = "Error al listar ventas" });
+            }
+        }
+
+        [HttpPut("{id}/anular")]
+        [ProducesResponseType(typeof(AnularVentaResponseDTO), 200)]
+        public async Task<ActionResult<AnularVentaResponseDTO>> AnularVenta(int id, [FromBody] AnularVentaRequest request)
+        {
+            try
+            {
+                var usuario = User.Identity?.Name ?? "SYSTEM";
+                var resultado = await _service.AnularVentaAsync(id, request.Motivo, usuario);
+                return Ok(resultado);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error anulando venta {Id}", id);
+                return StatusCode(500, new { mensaje = "Error al anular la venta" });
             }
         }
     }
