@@ -264,6 +264,23 @@ namespace SistemaContable.API.Controllers
             }
         }
 
+        [HttpGet("contadores/{id}")]
+        [ProducesResponseType(typeof(ContadoresResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ContadoresResponse>> ObtenerContador(int id) 
+        {
+            try
+            {
+                var response = await _empresaService.ObtenerContadorPorIdAsync(id);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener contador");
+                return StatusCode(500, new { message = "Error interno del servidor" });
+            }
+        }
+
         /// <summary>
         /// Obtener mis empresas (como contador)
         /// </summary>

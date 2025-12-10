@@ -168,6 +168,19 @@ namespace SistemaContable.Application.Services.Implementations
             }
         }
 
+        public async Task<EContadorDto> ObtenerContadorPorIdAsync(int id)
+        {
+            try
+            {
+                return await _empresaRepository.ObtenerContadorPorIdAsync(id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error en ObtenerContadorPorIdAsync para {id}", id);
+                throw;
+            }
+        }
+
         public async Task<EEmpresa?> ObtenerEmpresaPorIdAsync(Guid empresaId)
         {
             try

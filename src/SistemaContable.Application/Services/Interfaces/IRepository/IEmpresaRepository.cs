@@ -29,6 +29,8 @@ namespace SistemaContable.Application.Services.Interfaces.IRepository
 
         Task<List<EContadorDto>> ListarContadoresAsync();
 
+        Task<EContadorDto?> ObtenerContadorPorIdAsync(int id);
+
         Task<ApiResponseDto<bool>> CambiarEstadoAsync(Guid empresaId, bool activo);
     }
 }

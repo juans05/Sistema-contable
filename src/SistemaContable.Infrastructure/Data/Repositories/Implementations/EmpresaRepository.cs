@@ -345,6 +345,29 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             }
         }
 
+        public async Task<EContadorDto?> ObtenerContadorPorIdAsync(int id)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var contador = await connection.QueryFirstOrDefaultAsync<EContadorDto>(
+                    @"SELECT * FROM ""suizaConta"".sp_contador_obtener_por_id(@p_id)",
+                    new { p_id = id },
+                    commandType: CommandType.Text,
+                    commandTimeout: 10
+                );
+
+                return contador;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al obtener contador");
+                throw;
+            }
+        }
+
         public async Task<EEmpresa?> ObtenerPorIdAsync(Guid empresaId)
         {
             try

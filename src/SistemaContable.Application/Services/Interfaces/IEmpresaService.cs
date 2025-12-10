@@ -27,6 +27,7 @@ namespace SistemaContable.Application.Services.Interfaces
         Task<ApiResponseDto<bool>> AsignarContadorAsync(AsignarContadorRequest dto, int asignadoPor);
 
         Task<List<EContadorDto>> ListarContadoresAsync();
+        Task<EContadorDto> ObtenerContadorPorIdAsync(int id);
         Task<CambiarEstadoResponse> CambiarEstadoEmpresaAsync(CambiarEstadoRequest request);
     }
 }
