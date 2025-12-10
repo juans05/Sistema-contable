@@ -7,6 +7,7 @@ using System.Xml.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using SistemaContable.Application.DTOs.Common;
+using SistemaContable.Application.DTOs.Responses.Compra;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Common.Helpers;
@@ -23,6 +24,56 @@ namespace SistemaContable.Application.Services.Implementations
         {
             _compraRepository = compraRepository;
             _logger = logger;
+        }
+
+        public async Task<AnularCompraResponseDTO> AnularCompraAsync(int idRegCompras, string motivo, string usuario)
+        {
+            var response = new AnularCompraResponseDTO();
+
+            try
+            {
+                var result = await _compraRepository.AnularCompraAsync(idRegCompras, motivo, usuario);
+
+                response.Anulado = result.OAnulado;
+                response.Message = result.OMensaje;
+            }
+            catch (Exception ex)
+            {
+                response.Anulado = false;
+                response.Message = ex.Message;
+                _logger.LogError(ex, "Error anulando venta ID: {IdRegCompras}", idRegCompras);
+            }
+
+            return response;
+        }
+
+        public async Task<List<CompraListaDto>> ListarComprasAsync(string fechaDesde, string fechaHasta, string rucProveedor = null, string tipoDoc = null, string estadoDoc = null, string _RucEmpresa = null)
+        {
+            try
+            {
+                return await _compraRepository.ListarComprasAsync(
+                    fechaDesde, fechaHasta,
+                    rucProveedor, tipoDoc,
+                    estadoDoc, _RucEmpresa, 1000, 0);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listando compras");
+                throw;
+            }
+        }
+
+        public async Task<CompraCompletaDto> ObtenerCompraPorIdAsync(int idRegCompras)
+        {
+            try
+            {
+                return await _compraRepository.ObtenerCompraPorIdAsync(idRegCompras);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo compra");
+                throw;
+            }
         }
 
         public async Task<ProcesarXmlCompraRespondeDto> ProcesarXmlYRegistrarCompraAsync(List<IFormFile> archivosXml, string usuario, string ruc)
@@ -109,10 +160,11 @@ namespace SistemaContable.Application.Services.Implementations
                         ImpIgv = datosXml.MontoIgv,
                         TotalDoc = datosXml.MontoTotal,
                         TipOperaSunat = datosXml.TipoOperacion,
-                        estadoDocumento = 1
+                        estadoDocumento = 1,
+                        RucEmpresa = ruc
                     };
 
-                    var resultadoCompra = await _compraRepository.InsertarRegistroCompraAsync(compraDto, usuario);
+                    var resultadoCompra = await _compraRepository.InsertarRegistroCompraAsync(compraDto, usuario, ruc);
 
                     if (resultadoCompra.OExisteDuplicado || !resultadoCompra.OIdRegCompra.HasValue)
                     {

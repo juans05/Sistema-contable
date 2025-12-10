@@ -25,6 +25,7 @@ namespace SistemaContable.Domain.Models
         public decimal TotalDoc { get; set; }
         public string TipOperaSunat { get; set; }
         public int estadoDocumento { get; set; }
+        public string RucEmpresa { get; set; }
     }
 
     public class RegistroCompraDetalleDto 

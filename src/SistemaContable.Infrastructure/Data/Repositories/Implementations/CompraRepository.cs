@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Dapper;
+using Microsoft.AspNetCore.Mvc.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -72,7 +73,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             }
         }
 
-        public async Task<SpResultado> InsertarRegistroCompraAsync(RegistroCompraDto compra, string usuario)
+        public async Task<SpResultado> InsertarRegistroCompraAsync(RegistroCompraDto compra, string usuario, string rucEmpresa)
         {
             try
             {
@@ -97,12 +98,13 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     p_total_doc = compra.TotalDoc,
                     p_tip_opera_sunat = compra.TipOperaSunat,
                     p_usuario_creacion = usuario,
-                    p_estado = compra.estadoDocumento
+                    p_estado = compra.estadoDocumento,
+                    p_ruc_empresa = rucEmpresa
                 };
 
                 var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
                     "SELECT * FROM \"suizaConta\".sp_insertar_registro_compra(@p_id_factura_compra_electronica, @p_ruc_prov, @p_periodo, @p_nombre_prov, @p_tipo_doc, @p_serie_doc, @p_num_doc," +
-                    " @p_fecha_emision, @p_fecha_vencimiento, @p_tip_cambio, @p_moneda, @p_sub_total, @p_imp_igv, @p_total_doc, @p_tip_opera_sunat, @p_usuario_creacion,@p_estado)",
+                    " @p_fecha_emision, @p_fecha_vencimiento, @p_tip_cambio, @p_moneda, @p_sub_total, @p_imp_igv, @p_total_doc, @p_tip_opera_sunat, @p_usuario_creacion,@p_estado, @p_ruc_empresa)",
                     parameters,
                     commandTimeout: 30
                 );
@@ -174,6 +176,120 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 new { Hash = hash, ruc = ruc },
                 commandTimeout: 10
             );
+        }
+
+        public async Task<List<CompraListaDto>> ListarComprasAsync(string fechaDesde, string fechaHasta, string rucProveedor = null, string tipoDoc = null, string estadoDoc = null, string _RucEmpresa = null, int limite = 100, int offset = 0)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var parameters = new
+                {
+                    p_fecha_desde = fechaDesde,
+                    p_fecha_hasta = fechaHasta,
+                    p_ruc_proveedor = rucProveedor,
+                    p_tipo_doc = tipoDoc,
+                    p_estado_doc = estadoDoc,
+                    p_ruc_empresa = _RucEmpresa,
+                    p_limite = limite,
+                    p_offset = offset
+                };
+
+                var result = await connection.QueryAsync<CompraListaDto>(
+                    "SELECT * FROM \"suizaConta\".sp_listar_compras(@p_fecha_desde, @p_fecha_hasta, @p_ruc_proveedor, @p_tipo_doc, @p_estado_doc,@p_ruc_empresa, @p_limite, @p_offset)",
+                    parameters,
+                    commandTimeout: 60
+                );
+
+                return result.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listando compras");
+                return new List<CompraListaDto>();
+            }
+        }
+
+        public async Task<SpResultado> AnularCompraAsync(int idRegCompras, string motivo, string usuario)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
+                        @"SELECT * FROM ""suizaConta"".sp_anular_compra(@p_id_reg_compras, @p_motivo, @p_usuario)",
+                        new
+                        {
+                            p_id_reg_compras = idRegCompras,
+                            p_motivo = motivo,
+                            p_usuario = usuario
+                        },
+                        commandTimeout: 30
+                    );
+
+                return result ?? new SpResultado { OMensaje = "Error: No se obtuvo respuesta del SP" };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error anulando compra");
+                return new SpResultado { OMensaje = $"Error: {ex.Message}" };
+            }
+        }
+
+        public async Task<CompraCompletaDto> ObtenerCompraPorIdAsync(int id)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var compraData = await connection.QueryAsync<CompraCompletaRaw>(
+                        "SELECT * FROM \"suizaConta\".sp_obtener_compra_completa(@p_id_reg_compras)",
+                        new { p_id_reg_compras = id },
+                        commandTimeout: 30
+                    );
+
+                if (!compraData.Any())
+                    return null;
+
+                var primera = compraData.First();
+
+                return new CompraCompletaDto
+                {
+                    IdRegCompras = primera.IdRegCompras,
+                    IdFacturaCompraElectronica = primera.IdFacturaCompraElectronica,
+                    NumeroDocumento = primera.NumeroDocumento,
+                    FechaEmision = primera.FechaEmision,
+                    RucProveedor = primera.RucProveedor,
+                    NombreProveedor = primera.NombreProveedor,
+                    Moneda = primera.Moneda,
+                    SubTotal = primera.SubTotal,
+                    ImpIgv = primera.ImpIgv,
+                    TotalDoc = primera.TotalDoc,
+                    EstadoDoc = primera.EstadoDoc,
+                    EstadoSunat = primera.EstadoSunat,
+                    NumeroFacturaCompraElectronica = primera.NumeroFacturaElectronica,
+                    Detalles = compraData
+                        .Where(d => d.DetalleId.HasValue)
+                        .Select(d => new DetalleCompraDto
+                        {
+                            NumeroLinea = d.DetalleNumeroLinea ?? 0,
+                            CodigoProducto = d.DetalleProducto,
+                            Descripcion = d.DetalleDescripcion,
+                            Cantidad = d.DetalleCantidad ?? 0,
+                            Precio = d.DetallePrecio ?? 0,
+                            Total = d.DetalleTotal ?? 0
+                        }).ToList()
+                };
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
         }
     }
 }
