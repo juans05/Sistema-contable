@@ -1,0 +1,36 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace SistemaContable.Domain.Models
+{
+    public class ContadorCompletoDto
+    {
+        public int Id { get; set; }
+
+        public string NombreCompleto { get; set; } = string.Empty;
+
+        public string Email { get; set; } = string.Empty;
+
+        public string Username { get; set; } = string.Empty;
+
+        public bool Activo { get; set; }
+
+        public long EmpresasAsignadas { get; set; }
+
+        public List<PermisosContadorDto> PermisosPorEmpresa { get; set; } = new List<PermisosContadorDto>();
+    }
+
+    public class PermisosContadorDto 
+    {
+        public Guid EmpresaId { get; set; }
+
+        public bool PuedeCrearUsuarios { get; set; }
+
+        public bool PuedeModificarConfig { get; set; }
+
+        public bool PuedeEliminar { get; set; }
+    }
+}

@@ -9,6 +9,7 @@ using SistemaContable.Application.DTOs.Responses;
 using SistemaContable.Application.DTOs.Responses.Empresa;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Domain.Entities;
+using SistemaContable.Domain.Models;
 using SistemaContable.Infrastructure.Models;
 using System;
 using System.Collections.Generic;
@@ -345,21 +346,40 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             }
         }
 
-        public async Task<EContadorDto?> ObtenerContadorPorIdAsync(int id)
+        public async Task<ContadorCompletoDto?> ObtenerContadorPorIdAsync(int id)
         {
             try
             {
                 await using var connection = new NpgsqlConnection(_connectionString);
                 await connection.OpenAsync();
 
-                var contador = await connection.QueryFirstOrDefaultAsync<EContadorDto>(
+                var contador = await connection.QueryAsync<ContadorCompletoRaw>(
                     @"SELECT * FROM ""suizaConta"".sp_contador_obtener_por_id(@p_id)",
                     new { p_id = id },
-                    commandType: CommandType.Text,
                     commandTimeout: 10
                 );
 
-                return contador;
+                if (!contador.Any())
+                    return null;
+
+                var primero = contador.First();
+
+                return new ContadorCompletoDto
+                {
+                    Id = primero.Id,
+                    NombreCompleto = primero.NombreCompleto,
+                    Email = primero.Email,
+                    Username = primero.Username,
+                    Activo = primero.Activo,
+                    EmpresasAsignadas = primero.EmpresasAsignadas,
+                    PermisosPorEmpresa = contador.Select(c => new PermisosContadorDto
+                    {
+                        EmpresaId = c.EmpresaId,
+                        PuedeCrearUsuarios = c.PuedeCrearUsuarios,
+                        PuedeModificarConfig = c.PuedeModificarConfig,
+                        PuedeEliminar = c.PuedeEliminar
+                    }).ToList()
+                };
             }
             catch (Exception ex)
             {

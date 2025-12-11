@@ -4,6 +4,7 @@ using SistemaContable.Application.DTOs.Requests.Empresa;
 using SistemaContable.Application.DTOs.Responses;
 using SistemaContable.Application.DTOs.Responses.Empresa;
 using SistemaContable.Domain.Entities;
+using SistemaContable.Domain.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,7 +28,7 @@ namespace SistemaContable.Application.Services.Interfaces
         Task<ApiResponseDto<bool>> AsignarContadorAsync(AsignarContadorRequest dto, int asignadoPor);
 
         Task<List<EContadorDto>> ListarContadoresAsync();
-        Task<EContadorDto> ObtenerContadorPorIdAsync(int id);
+        Task<ContadorCompletoDto?> ObtenerContadorPorIdAsync(int id);
         Task<CambiarEstadoResponse> CambiarEstadoEmpresaAsync(CambiarEstadoRequest request);
     }
 }

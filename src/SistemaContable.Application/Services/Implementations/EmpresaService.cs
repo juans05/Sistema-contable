@@ -6,6 +6,7 @@ using SistemaContable.Application.DTOs.Responses.Empresa;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Domain.Entities;
+using SistemaContable.Domain.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -168,7 +169,7 @@ namespace SistemaContable.Application.Services.Implementations
             }
         }
 
-        public async Task<EContadorDto> ObtenerContadorPorIdAsync(int id)
+        public async Task<ContadorCompletoDto?> ObtenerContadorPorIdAsync(int id)
         {
             try
             {
