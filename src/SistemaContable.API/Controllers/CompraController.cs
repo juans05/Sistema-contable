@@ -1,9 +1,11 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using SistemaContable.Application.DTOs.Requests.Venta;
+using SistemaContable.Application.DTOs.Responses.Venta;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Domain.Models;
+using System.Security.Claims;
 
 namespace SistemaContable.API.Controllers
 {
@@ -88,5 +90,79 @@ namespace SistemaContable.API.Controllers
                 });
             }
         }
+
+
+        [HttpGet("{id}")]
+        [ProducesResponseType(typeof(VentaCompletaDto), 200)]
+        [ProducesResponseType(404)]
+        public async Task<ActionResult<VentaCompletaDto>> ObtenerVenta(int id)
+        {
+            try
+            {
+                var venta = await _service.ObtenerCompraPorIdAsync(id);
+
+                if (venta == null)
+                    return NotFound(new { mensaje = $"Venta {id} no encontrada" });
+
+                return Ok(venta);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo venta {Id}", id);
+                return StatusCode(500, new { mensaje = "Error al obtener la venta" });
+            }
+        }
+
+        /// <summary>
+        /// Lista ventas con filtros
+        /// </summary>
+        [HttpGet]
+        [ProducesResponseType(typeof(List<VentaListaDto>), 200)]
+        public async Task<ActionResult<List<VentaListaDto>>> ListarCompra(
+            [FromQuery] string fechaDesde,
+            [FromQuery] string fechaHasta,
+            [FromQuery] string rucCliente = null,
+            [FromQuery] string tipoDoc = null,
+            [FromQuery] string estadoDoc = null)
+        {
+            try
+            {
+
+                var usuario = User.Identity?.Name ?? "SYSTEM";
+                var ventas = await _service.ListarCompraAsync(
+                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa);
+
+                return Ok(new
+                {
+                    total = ventas.Count,
+                    ventas = ventas
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listando ventas");
+                return StatusCode(500, new { mensaje = "Error al listar ventas" });
+            }
+        }
+
+        [HttpPut("{id}/anular")]
+        [ProducesResponseType(typeof(AnularVentaResponseDTO), 200)]
+        public async Task<ActionResult<AnularVentaResponseDTO>> AnularVenta(int id, [FromBody] AnularVentaRequest request)
+        {
+            try
+            {
+                var usuario = User.Identity?.Name ?? "SYSTEM";
+                var resultado = await _service.AnularCompraAsync(id, request.Motivo, usuario);
+                return Ok(resultado);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error anulando venta {Id}", id);
+                return StatusCode(500, new { mensaje = "Error al anular la venta" });
+            }
+        }
+
+
+
     }
 }

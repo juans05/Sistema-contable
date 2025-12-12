@@ -7,6 +7,7 @@ using System.Xml.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using SistemaContable.Application.DTOs.Common;
+using SistemaContable.Application.DTOs.Responses.Venta;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Common.Helpers;
@@ -23,6 +24,21 @@ namespace SistemaContable.Application.Services.Implementations
         {
             _compraRepository = compraRepository;
             _logger = logger;
+        }
+
+        public async Task<AnularVentaResponseDTO> AnularCompraAsync(int idRegVenta, string motivo, string usuario)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<List<VentaListaDto>> ListarCompraAsync(string fechaDesde, string fechaHasta, string rucCliente = null, string tipoDoc = null, string estadoDoc = null, string _RucEmpresa = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<VentaCompletaDto> ObtenerCompraPorIdAsync(int idRegVenta)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task<ProcesarXmlCompraRespondeDto> ProcesarXmlYRegistrarCompraAsync(List<IFormFile> archivosXml, string usuario, string ruc)

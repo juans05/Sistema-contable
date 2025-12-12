@@ -17,7 +17,7 @@ namespace SistemaContable.Domain.Models
         public string Moneda { get; set; }
         public decimal SubTotal { get; set; }
         public decimal ImpIgv { get; set; }
-        public decimal TotalDoc { get; set; }
+        public decimal TotalDoc { get; set; }   
         public string EstadoDoc { get; set; }
         public string EstadoSunat { get; set; }
         public string NumeroFacturaElectronica { get; set; }
