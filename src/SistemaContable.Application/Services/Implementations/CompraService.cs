@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using SistemaContable.Application.DTOs.Common;
@@ -19,26 +20,76 @@ namespace SistemaContable.Application.Services.Implementations
     {
         private readonly ICompraRepository _compraRepository;
         private readonly ILogger<CompraService> _logger;
+        private readonly IAccountingEngineService _accountingEngine;
 
-        public CompraService(ICompraRepository compraRepository, ILogger<CompraService> logger)
+        public CompraService(ICompraRepository compraRepository, IAccountingEngineService accountingEngine, ILogger<CompraService> logger)
         {
             _compraRepository = compraRepository;
+            _accountingEngine = accountingEngine;
             _logger = logger;
         }
 
         public async Task<AnularVentaResponseDTO> AnularCompraAsync(int idRegVenta, string motivo, string usuario)
         {
-            throw new NotImplementedException();
+             // TODO: Implement Anular Logic if needed via Repo
+             throw new NotImplementedException();
         }
 
-        public async Task<List<VentaListaDto>> ListarCompraAsync(string fechaDesde, string fechaHasta, string rucCliente = null, string tipoDoc = null, string estadoDoc = null, string _RucEmpresa = null)
+        public async Task<List<VentaListaDto>> ListarCompraAsync(string fechaDesde, string fechaHasta, string rucCliente = null, string tipoDoc = null, string estadoDoc = null, string _RucEmpresa = null, int page = 1, int pageSize = 10, string filtro = null)
         {
-            throw new NotImplementedException();
+             int offset = (page - 1) * pageSize;
+             return await _compraRepository.ListarComprasAsync(fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa, pageSize, offset, filtro);
         }
 
         public async Task<VentaCompletaDto> ObtenerCompraPorIdAsync(int idRegVenta)
         {
-            throw new NotImplementedException();
+            return await _compraRepository.ObtenerCompraCompletaAsync(idRegVenta);
+        }
+
+        public async Task<string> ObtenerXmlCompraAsync(int idRegVenta)
+        {
+            var xml = await _compraRepository.ObtenerXmlCompraPorIdAsync(idRegVenta);
+            return XmlCompressor.Decompress(xml);
+        }
+
+        public async Task<byte[]> GenerarReporteExcelComprasAsync(
+           string fechaDesde, string fechaHasta,
+           string rucCliente = null, string tipoDoc = null,
+           string estadoDoc = null, string _RucEmpresa = null)
+        {
+            var compras = await _compraRepository.ListarComprasAsync(
+                fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa, 10000, 0);
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Compras");
+
+            // Cabeceras
+            worksheet.Cell(1, 1).Value = "F. Emisión";
+            worksheet.Cell(1, 2).Value = "Documento";
+            worksheet.Cell(1, 3).Value = "RUC Prov";
+            worksheet.Cell(1, 4).Value = "Proveedor";
+            worksheet.Cell(1, 5).Value = "Mon";
+            worksheet.Cell(1, 6).Value = "Total";
+            worksheet.Cell(1, 7).Value = "Estado";
+
+            // Datos
+            int row = 2;
+            foreach (var c in compras)
+            {
+                worksheet.Cell(row, 1).Value = c.FechaEmision;
+                worksheet.Cell(row, 2).Value = c.NumeroDocumento;
+                worksheet.Cell(row, 3).Value = c.RucCliente;
+                worksheet.Cell(row, 4).Value = c.RazonSocial;
+                worksheet.Cell(row, 5).Value = c.Moneda;
+                worksheet.Cell(row, 6).Value = c.TotalDoc;
+                worksheet.Cell(row, 7).Value = c.EstadoDoc;
+                row++;
+            }
+
+            worksheet.Columns().AdjustToContents();
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
         }
 
         public async Task<ProcesarXmlCompraRespondeDto> ProcesarXmlYRegistrarCompraAsync(List<IFormFile> archivosXml, string usuario, string ruc)
@@ -173,6 +224,18 @@ namespace SistemaContable.Application.Services.Implementations
                     _logger.LogInformation(
                         "Compra procesada exitosamente: {NumeroDocumento}, IdCompra: {IdCompra}",
                         datosXml.NumeroCompleto, idRegCompra);
+
+                    // ==========================================
+                    //  MOTOR CONTABLE: Generar Asiento Automático
+                    // ==========================================
+                    try
+                    {
+                        await _accountingEngine.GenerarAsientoCompraAsync(idRegCompra);
+                    }
+                    catch (Exception exCont)
+                    {
+                        _logger.LogError(exCont, "Error generando asiento contable para Compra {Id}", idRegCompra);
+                    }
                 }
                 catch (Exception ex)
                 {

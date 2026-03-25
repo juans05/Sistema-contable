@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Domain.Models;
+using SistemaContable.Domain.Entities;
 
 namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 {
@@ -174,6 +175,251 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                 new { Hash = hash, ruc = ruc },
                 commandTimeout: 10
             );
+        }
+        public async Task<List<VentaListaDto>> ListarComprasAsync(
+           string fechaDesde, string fechaHasta,
+           string rucProveedor = null, string tipoDoc = null,
+           string estadoDoc = null, string _RucEmpresa = null,
+           int limit = 10, int offset = 0, string filtro = null)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var sqlBuilder = new StringBuilder(@"
+                    SELECT 
+                        rc.id AS ""IdRegVenta"",
+                        COALESCE(rc.serie_doc, '') || '-' || COALESCE(rc.num_doc, '') AS ""NumeroDocumento"",
+                        rc.fecha_emision AS ""FechaEmision"",
+                        rc.ruc_prov AS ""RucCliente"",
+                        rc.nombre_prov AS ""RazonSocial"",
+                        rc.moneda AS ""Moneda"",
+                        rc.total_doc AS ""TotalDoc"",
+                        rc.estado_documento::text AS ""EstadoDoc"",
+                        '' AS ""EstadoSunat"",
+                        '' AS ""NumeroFactura"",
+                        0 AS ""CantidadItems""
+                    FROM ""suizaConta"".registro_compras rc
+                    WHERE rc.fecha_emision >= @FechaDesde::date 
+                      AND rc.fecha_emision <= @FechaHasta::date
+                ");
+
+                var parameters = new DynamicParameters();
+                parameters.Add("FechaDesde", fechaDesde);
+                parameters.Add("FechaHasta", fechaHasta);
+                parameters.Add("Limit", limit);
+                parameters.Add("Offset", offset);
+
+                if (!string.IsNullOrEmpty(rucProveedor)) 
+                {
+                    sqlBuilder.Append(" AND rc.ruc_prov = @RucProv");
+                    parameters.Add("RucProv", rucProveedor);
+                }
+
+                if (!string.IsNullOrEmpty(tipoDoc)) 
+                {
+                    sqlBuilder.Append(" AND rc.tipo_doc = @TipoDoc");
+                    parameters.Add("TipoDoc", tipoDoc);
+                }
+
+                if (!string.IsNullOrEmpty(estadoDoc)) 
+                {
+                    sqlBuilder.Append(" AND rc.estado_documento::text = @EstadoDoc");
+                    parameters.Add("EstadoDoc", estadoDoc);
+                }
+
+                if (!string.IsNullOrEmpty(filtro))
+                {
+                     sqlBuilder.Append(@" AND (
+                        rc.nombre_prov ILIKE @Filtro 
+                        OR rc.ruc_prov ILIKE @Filtro 
+                        OR (COALESCE(rc.serie_doc, '') || '-' || COALESCE(rc.num_doc, '')) ILIKE @Filtro
+                    )");
+                    parameters.Add("Filtro", $"%{filtro}%");
+                }
+                
+                sqlBuilder.Append(" ORDER BY rc.fecha_emision DESC LIMIT @Limit OFFSET @Offset");
+
+                var result = await connection.QueryAsync<VentaListaDto>(sqlBuilder.ToString(), parameters);
+
+                return result.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listando compras");
+                return new List<VentaListaDto>();
+            }
+        }
+
+        public async Task<VentaCompletaDto> ObtenerCompraCompletaAsync(int idRegCompra)
+        {
+             try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                // Simple Get
+                var sql = @"SELECT 
+                                id AS IdRegVenta,
+                                id_factura_compra_electronica AS IdFacturaElectronica,
+                                COALESCE(serie_doc, '') || '-' || COALESCE(num_doc, '') AS NumeroDocumento,
+                                fecha_emision AS FechaEmision,
+                                ruc_prov AS RucCliente,
+                                nombre_prov AS RazonSocialCliente,
+                                moneda AS Moneda,
+                                sub_total AS SubTotal,
+                                imp_igv AS ImpIgv,
+                                total_doc AS TotalDoc
+                            FROM ""suizaConta"".registro_compras 
+                            WHERE id = @Id";
+                
+                var compra = await connection.QueryFirstOrDefaultAsync<VentaCompletaDto>(sql, new { Id = idRegCompra });
+                
+                if(compra != null) {
+                    // Get Details
+                     var sqlDet = @"SELECT 
+                                    numero_linea AS NumeroLinea,
+                                    codigo_producto AS CodigoProducto,
+                                    descripcion_producto AS Descripcion,
+                                    cantidad AS Cantidad,
+                                    precio_unitario AS Precio,
+                                    total_linea AS Total
+                                   FROM ""suizaConta"".registro_compras_detalles
+                                   WHERE id_reg_compra = @Id";
+                     
+                     var detalles = await connection.QueryAsync<DetalleVentaDto>(sqlDet, new { Id = idRegCompra });
+                     compra.Detalles = detalles.ToList();
+                }
+
+                return compra;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo compra completa");
+                return null;
+            }
+        }
+
+        public async Task<string> ObtenerXmlCompraPorIdAsync(int idRegCompra)
+        {
+             try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var xml = await connection.QueryFirstOrDefaultAsync<string>(
+                    @"SELECT f.xml_original 
+                      FROM ""suizaConta"".facturas_compras_electronicas f
+                      INNER JOIN ""suizaConta"".registro_compras c ON c.id_factura_compra_electronica = f.id
+                      WHERE c.id = @Id",
+                    new { Id = idRegCompra },
+                    commandTimeout: 10
+                );
+
+                return xml;
+            }
+            catch (Exception ex)
+            {
+                 _logger.LogError(ex, "Error obteniendo XML de compra {Id}", idRegCompra);
+                return null;
+            }
+        }
+        public async Task<ERegistroCompra> ObtenerCompraPorIdAsync(int idRegCompra)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var sql = @"SELECT 
+                                id AS IdRegCompras,
+                                id_ruc_prov AS IdRucProveedor,
+                                periodo AS Periodo,
+                                nombre_prov AS NombreProv,
+                                moneda AS Moneda,
+                                tip_cambio AS TipCambio,
+                                tipo_doc AS TipDocumento,
+                                serie_doc AS SerieDocumento,
+                                num_doc AS NoDocumento,
+                                fecha_emision AS FEmisc,
+                                fecha_vencimiento AS FVcto,
+                                sub_total AS SubTotal,
+                                imp_igv AS ImpIgv,
+                                total_doc AS TotalDoc,
+                                estado_documento AS EstadoDocumento
+                            FROM ""suizaConta"".registro_compras 
+                            WHERE id = @Id";
+
+                return await connection.QueryFirstOrDefaultAsync<ERegistroCompra>(sql, new { Id = idRegCompra });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo entidad compra {Id}", idRegCompra);
+                return null;
+            }
+        }
+        public async Task<List<SistemaContable.Application.DTOs.Sire.SireCompraDto>> ListarComprasParaSire(string periodo, string rucEmpresa)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                // Lógica simplificada: Asumimos todo como "Base Imponible Gravada - Destino Gravado" (DG)
+                // En un sistema real, se debería determinar el destino (Gravado, Mixto, No Gravado) según la cuenta contable o configuración.
+                var sql = @"
+                    SELECT 
+                        c.id AS Id,
+                        '' AS RucEmpresa, -- Se llenará en servicio o join
+                        '' AS RazonSocialEmpresa, 
+                        c.periodo AS Periodo,
+                        '' AS Car, 
+                        c.fecha_emision AS FechaEmision,
+                        c.fecha_vencimiento AS FechaVencimiento,
+                        c.tipo_doc AS TipoComprobante,
+                        c.serie_doc AS Serie,
+                        '' AS AnioEmisionDua,
+                        c.num_doc AS Numero,
+                        '6' AS TipoDocProveedor, -- Default RUC
+                        c.ruc_prov AS RucProveedor,
+                        c.nombre_prov AS RazonSocialProveedor,
+                        
+                        -- Asumimos todo a Destino Gravado (DG) por ahora
+                        CASE WHEN c.imp_igv > 0 THEN c.sub_total ELSE 0.00 END AS BaseImponibleGravadaDG,
+                        c.imp_igv AS IgvDG,
+                        
+                        0.00 AS BaseImponibleGravadaDM,
+                        0.00 AS IgvDM,
+                        
+                        0.00 AS BaseImponibleGravadaDNG,
+                        0.00 AS IgvDNG,
+                        
+                        CASE WHEN c.imp_igv = 0 THEN c.sub_total ELSE 0.00 END AS MontoExonerado,
+                        0.00 AS MontoInafecto,
+                        0.00 AS MontoIsc,
+                        0.00 AS MontoIcbper,
+                        0.00 AS OtrosTributos,
+                        c.total_doc AS TotalComprobante,
+                        
+                        c.moneda AS Moneda,
+                        c.tip_cambio AS TipoCambio
+                        
+                    FROM ""suizaConta"".registro_compras c
+                    WHERE c.periodo = @Periodo 
+                      
+                    ORDER BY c.fecha_emision ASC, c.serie_doc ASC, c.num_doc ASC";
+                    // TODO: Filtrar por rucEmpresa si la tabla registro_compras tuviera esa columna bien poblada. 
+                    // Asumimos que el filtrado por tenant se hace antes o la tabla es compartida (FIXME).
+
+                var result = await connection.QueryAsync<SistemaContable.Application.DTOs.Sire.SireCompraDto>(sql, new { Periodo = periodo });
+                return result.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listando compras para SIRE");
+                return new List<SistemaContable.Application.DTOs.Sire.SireCompraDto>();
+            }
         }
     }
 }

@@ -18,7 +18,13 @@ namespace SistemaContable.Application.Services.Interfaces
         Task<List<VentaListaDto>> ListarVentasAsync(
             string fechaDesde, string fechaHasta,
             string rucCliente = null, string tipoDoc = null,
-            string estadoDoc = null, string _RucEmpresa = null);
+            string estadoDoc = null, string _RucEmpresa = null, string filtro = null,
+            int page = 1, int pageSize = 10);
         Task<AnularVentaResponseDTO> AnularVentaAsync(int idRegVenta, string motivo, string usuario);
+        Task<string> ObtenerXmlVentaAsync(int idRegVenta);
+        Task<byte[]> GenerarReporteExcelVentasAsync(
+             string fechaDesde, string fechaHasta,
+            string rucCliente = null, string tipoDoc = null,
+            string estadoDoc = null, string _RucEmpresa = null);
     }
 }

@@ -6,6 +6,7 @@ using SistemaContable.Application.DTOs.Requests;
 using SistemaContable.Application.DTOs.Responses;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Domain.Models;
+using SistemaContable.Domain.Entities;
 using System.Security.Claims;
 
 namespace SistemaContable.API.Controllers
@@ -15,11 +16,13 @@ namespace SistemaContable.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly Application.Services.Interfaces.IRepository.IAuthRepository _authRepository;
         private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, Application.Services.Interfaces.IRepository.IAuthRepository authRepository, ILogger<AuthController> logger)
         {
             _authService = authService;
+            _authRepository = authRepository;
             _logger = logger;
         }
         /// <summary>
@@ -36,6 +39,22 @@ namespace SistemaContable.API.Controllers
             {
                 _logger.LogInformation("Intento de login para usuario: {Username}", request.Username);
 
+                // Flujo 1: Si no hay RUC, validamos credenciales y devolvemos lista de empresas
+                if (string.IsNullOrEmpty(request.RucEmpresa))
+                {
+                    var empresas = await _authService.PreLoginAsync(request.Username, request.Password);
+                    if (empresas == null)
+                    {
+                         _logger.LogWarning("Login pre-auth fallido para usuario: {Username}", request.Username);
+                         return Unauthorized(new { message = "Usuario o contraseña incorrectos" });
+                    }
+                    
+                    return Ok(new { 
+                        NeedCompanySelection = true, 
+                        Companies = empresas 
+                    });
+                }
+                
                 var response = await _authService.LoginAsync(request);
 
                 if (response == null)
@@ -175,6 +194,16 @@ namespace SistemaContable.API.Controllers
                 _logger.LogError(ex, "Error al cerrar sesión");
                 return StatusCode(500, new { message = "Error interno del servidor" });
             }
+        }
+        /// <summary>
+        /// DEBUG: Listar usuarios
+        /// </summary>
+        [HttpGet("debug-users")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetDebugUsers()
+        {
+            var users = await _authRepository.ListarUsuariosAsync();
+            return Ok(users);
         }
     }
 }

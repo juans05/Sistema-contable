@@ -4,6 +4,9 @@ using SistemaContable.Application.DTOs.Requests.Venta;
 using SistemaContable.Application.DTOs.Responses.Venta;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Domain.Models;
+using System.Text.RegularExpressions;
+using System.Text;
+using System.Xml.Linq;
 using System.Security.Claims;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -28,6 +31,12 @@ namespace SistemaContable.API.Controllers
             _logger = logger;
             _RucEmpresa = _rucEmpresaService.ObtenerRucActual();
         }
+        private string GetCurrentRuc()
+        {
+            if (!string.IsNullOrEmpty(_RucEmpresa)) return _RucEmpresa;
+            return User.FindFirst("RUC")?.Value;
+        }
+
         [HttpPost("procesar-xml")]
         [ProducesResponseType(typeof(ProcesarXmlResponseDto), 200)]
         [ProducesResponseType(400)]
@@ -47,9 +56,12 @@ namespace SistemaContable.API.Controllers
 
                 var userId = int.Parse(userIdClaim);
 
-                // Extraer EmpresaId del token o del query parameter
-                var empresaIdClaim = User.FindFirst("RUC")?.Value;
-                Guid currentEmpresaId;
+                var currentRuc = GetCurrentRuc();
+                if (string.IsNullOrEmpty(currentRuc))
+                {
+                     return BadRequest(new { mensaje = "No se pudo identificar la empresa (RUC no encontrado)" });
+                }
+
                 if (archivos == null || !archivos.Any())
                     return BadRequest(new { mensaje = "Debe enviar al menos un archivo XML" });
 
@@ -75,7 +87,7 @@ namespace SistemaContable.API.Controllers
                     });
 
                 var usuario = User.Identity?.Name ?? "SYSTEM";
-                var resultado = await _service.ProcesarXmlYRegistrarVentaAsync(archivos, usuario, (_RucEmpresa == null) ? empresaIdClaim : _RucEmpresa);
+                var resultado = await _service.ProcesarXmlYRegistrarVentaAsync(archivos, usuario, currentRuc);
 
                 return Ok(resultado);
             }
@@ -120,6 +132,57 @@ namespace SistemaContable.API.Controllers
         [HttpGet]
         [ProducesResponseType(typeof(List<VentaListaDto>), 200)]
         public async Task<ActionResult<List<VentaListaDto>>> ListarVentas(
+            [FromQuery] string? fechaDesde = null,
+            [FromQuery] string? fechaHasta = null,
+            [FromQuery] string? rucCliente = null,
+            [FromQuery] string? tipoDoc = null,
+            [FromQuery] string? estadoDoc = null,
+            [FromQuery] string? filtro = null,
+            [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            try
+            {
+                var currentRuc = GetCurrentRuc();
+                var usuario = User.Identity?.Name ?? "SYSTEM";
+                
+                _logger.LogInformation("Listando ventas. RUC: {Ruc}, Fechas: {Desde} - {Hasta}, Page: {Page}", currentRuc, fechaDesde, fechaHasta, page);
+
+                var ventas = await _service.ListarVentasAsync(
+                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, currentRuc, filtro, page, pageSize);
+
+                return Ok(new
+                {
+                    total = ventas.Count, // Nota: esto es el total de la página actual, idealmente el repo debería devolver count total. Por ahora mantenemos contrato.
+                    ventas = ventas
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listando ventas");
+                return StatusCode(500, new { mensaje = "Error al listar ventas" });
+            }
+        }
+
+        [HttpGet("{id}/xml")]
+        public async Task<IActionResult> DescargarXml(int id)
+        {
+            try
+            {
+                var xml = await _service.ObtenerXmlVentaAsync(id);
+                if (string.IsNullOrEmpty(xml)) return NotFound("XML no encontrado");
+
+                var bytes = Encoding.UTF8.GetBytes(xml);
+                return File(bytes, "application/xml", $"Venta_{id}.xml");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error descargando XML {Id}", id);
+                return StatusCode(500, "Error interno");
+            }
+        }
+
+        [HttpGet("excel")]
+        public async Task<IActionResult> DescargarExcel(
             [FromQuery] string fechaDesde,
             [FromQuery] string fechaHasta,
             [FromQuery] string rucCliente = null,
@@ -128,21 +191,16 @@ namespace SistemaContable.API.Controllers
         {
             try
             {
+                var currentRuc = GetCurrentRuc();
+                var archivo = await _service.GenerarReporteExcelVentasAsync(
+                   fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, currentRuc);
 
-                var usuario = User.Identity?.Name ?? "SYSTEM";
-                var ventas = await _service.ListarVentasAsync(
-                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa);
-
-                return Ok(new
-                {
-                    total = ventas.Count,
-                    ventas = ventas
-                });
+                return File(archivo, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Ventas_{DateTime.Now:yyyyMMdd}.xlsx");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error listando ventas");
-                return StatusCode(500, new { mensaje = "Error al listar ventas" });
+                _logger.LogError(ex, "Error generando Excel");
+                return StatusCode(500, "Error generando reporte");
             }
         }
 

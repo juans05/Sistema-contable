@@ -17,6 +17,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using ClosedXML.Excel;
 
 namespace SistemaContable.Application.Services.Implementations
 {
@@ -25,23 +26,29 @@ namespace SistemaContable.Application.Services.Implementations
         private readonly IVentaRepository _ventaRepository;
         private readonly IFacturaElectronicaRepository _facturaRepository;
         private readonly ILogger<VentaElectronicaService> _logger;
+        private readonly IAccountingEngineService _accountingEngine;
+
         public VentaElectronicaService(
             IVentaRepository ventaRepository,
             IFacturaElectronicaRepository facturaRepository,
+            IAccountingEngineService accountingEngine,
             ILogger<VentaElectronicaService> logger)
         {
             _ventaRepository = ventaRepository;
             _facturaRepository = facturaRepository;
+            _accountingEngine = accountingEngine;
             _logger = logger;
         }
 
         public async Task<List<VentaListaDto>> ListarVentasAsync(string fechaDesde, string fechaHasta, string rucCliente = null,
-                                                                 string tipoDoc = null, string estadoDoc = null,string _RucEmpresa = null)
+                                                                 string tipoDoc = null, string estadoDoc = null, string _RucEmpresa = null,
+                                                                 string filtro = null, int page = 1, int pageSize = 10)
         {
             try
             {
+                int offset = (page - 1) * pageSize;
                 return await _facturaRepository.ListarVentasAsync(
-                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa, 1000, 0);
+                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa, pageSize, offset, filtro);
             }
             catch (Exception ex)
             {
@@ -221,6 +228,19 @@ namespace SistemaContable.Application.Services.Implementations
                     _logger.LogInformation(
                         "Venta procesada exitosamente: {NumeroDocumento}, IdVenta: {IdVenta}",
                         datosXml.NumeroCompleto, idRegVenta);
+
+                    // ==========================================
+                    //  MOTOR CONTABLE: Generar Asiento Automático
+                    // ==========================================
+                    try
+                    {
+                        await _accountingEngine.GenerarAsientoVentaAsync(idRegVenta);
+                    }
+                    catch (Exception exCont)
+                    {
+                        // No bloqueamos el proceso de venta si falla la conta, pero logueamos
+                        _logger.LogError(exCont, "Error generando asiento contable para Venta {Id}", idRegVenta);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -486,6 +506,60 @@ namespace SistemaContable.Application.Services.Implementations
             }
 
             return response;
+        }
+        public async Task<string> ObtenerXmlVentaAsync(int idRegVenta)
+        {
+            var xml = await _facturaRepository.ObtenerXmlPorVentaIdAsync(idRegVenta);
+            return XmlCompressor.Decompress(xml);
+        }
+
+        public async Task<byte[]> GenerarReporteExcelVentasAsync(
+            string fechaDesde, string fechaHasta,
+            string rucCliente = null, string tipoDoc = null,
+            string estadoDoc = null, string _RucEmpresa = null)
+        {
+            // 1. Obtener datos (sin paginación o límite alto)
+            var ventas = await _facturaRepository.ListarVentasAsync(
+                fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa, 10000, 0);
+
+            // 2. Generar Excel
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Ventas");
+
+            // Cabeceras
+            worksheet.Cell(1, 1).Value = "F. Emisión";
+            worksheet.Cell(1, 2).Value = "Documento";
+            worksheet.Cell(1, 3).Value = "RUC Cliente";
+            worksheet.Cell(1, 4).Value = "Razón Social";
+            worksheet.Cell(1, 5).Value = "Mon";
+            worksheet.Cell(1, 6).Value = "Total";
+            worksheet.Cell(1, 7).Value = "Estado";
+            worksheet.Cell(1, 8).Value = "Sunat";
+
+            // Datos
+            int row = 2;
+            foreach (var v in ventas)
+            {
+                worksheet.Cell(row, 1).Value = v.FechaEmision;
+                worksheet.Cell(row, 2).Value = v.NumeroDocumento;
+                worksheet.Cell(row, 3).Value = v.RucCliente;
+                worksheet.Cell(row, 4).Value = v.RazonSocial;
+                worksheet.Cell(row, 5).Value = v.Moneda;
+                worksheet.Cell(row, 6).Value = v.TotalDoc;
+                worksheet.Cell(row, 7).Value = v.EstadoDoc;
+                worksheet.Cell(row, 8).Value = v.EstadoSunat;
+                row++;
+            }
+
+            // Estilos
+            var rango = worksheet.Range(1, 1, row - 1, 8);
+            rango.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            rango.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+            worksheet.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
         }
     }
 }

@@ -66,6 +66,8 @@ namespace SistemaContable.Application.DTOs.Responses
         public string? EmpresaLogo { get; init; }
         public string Rol { get; init; } = string.Empty;
         public bool EsPrincipal { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("empresaRuc")]
+        public string? Ruc { get; init; }
     }
 
     public record ConfiguracionUsuario

@@ -100,6 +100,7 @@ builder.Services.AddHttpContextAccessor(); // ⭐ AGREGADO
 // Repositories
 builder.Services.AddScoped<IAuthRepository, UserRepository>();
 builder.Services.AddScoped<IVentaRepository, VentaRepository>();
+builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
 builder.Services.AddScoped<IFacturaElectronicaRepository, FacturaElectronicaRepository>();
 builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
 builder.Services.AddScoped<ICompraRepository, CompraRepository>();
@@ -111,6 +112,11 @@ builder.Services.AddScoped<IVentaElectronicaService, VentaElectronicaService>();
 builder.Services.AddScoped<IRucEmpresaService, RucEmpresaService>();
 builder.Services.AddScoped<IEmpresaService, EmpresaService>();
 builder.Services.AddScoped<ICompraService, CompraService>();
+builder.Services.AddScoped<IProductoService, ProductoService>();
+builder.Services.AddScoped<IAccountingRepository, AccountingRepository>();
+builder.Services.AddScoped<IAccountingEngineService, AccountingEngineService>();
+builder.Services.AddScoped<ISireService, SireService>();
+builder.Services.AddScoped<IFinancialDashboardService, FinancialDashboardService>();
 
 var app = builder.Build();
 

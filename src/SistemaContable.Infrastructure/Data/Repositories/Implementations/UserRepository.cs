@@ -11,6 +11,7 @@ using SistemaContable.Domain.Models;
 using SistemaContable.Infrastructure.Data.Repositories.Interfaces;
 using SistemaContable.Infrastructure.Models;
 using System.Text.Json;
+using System.Text;
 
 namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 {
@@ -430,6 +431,123 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                // _logger.LogWarning(ex, "Error parseando JSON: {Json}", json);
                 return new T();
             }
+        }
+        public async Task<List<EUsuario>> ListarUsuariosAsync()
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            var sql = @"SELECT 
+                        id, username, email, nombre_completo AS NombreCompleto, 
+                        activo, fecha_creacion AS FechaCreacion
+                        FROM ""suizaConta"".usuarios
+                        WHERE deleted_at IS NULL
+                        ORDER BY id DESC";
+            var result = await connection.QueryAsync<EUsuario>(sql);
+            return result.ToList();
+        }
+
+        public async Task<EUsuario> ObtenerUsuarioPorIdAsync(int id)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            var sql = @"SELECT 
+                        id, username, email, nombre_completo AS NombreCompleto, 
+                        activo, fecha_creacion AS FechaCreacion
+                        FROM ""suizaConta"".usuarios
+                        WHERE id = @Id AND deleted_at IS NULL";
+            return await connection.QueryFirstOrDefaultAsync<EUsuario>(sql, new { Id = id });
+        }
+
+        public async Task<int> CrearUsuarioAsync(EUsuario usuario, string password)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            var passwordHash = _passwordService.HashPassword(password);
+            var sql = @"INSERT INTO ""suizaConta"".usuarios 
+                        (username, email, password_hash, nombre_completo, activo, fecha_creacion)
+                        VALUES (@Username, @Email, @PasswordHash, @NombreCompleto, @Activo, @FechaCreacion)
+                        RETURNING id";
+            
+            return await connection.ExecuteScalarAsync<int>(sql, new {
+                usuario.Username,
+                usuario.Email,
+                PasswordHash = passwordHash,
+                usuario.NombreCompleto,
+                usuario.Activo,
+                FechaCreacion = DateTime.Now
+            });
+        }
+
+        public async Task<bool> ActualizarUsuarioAsync(EUsuario usuario, string password = null)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            var sqlBuilder = new StringBuilder(@"UPDATE ""suizaConta"".usuarios SET 
+                        username = @Username,
+                        email = @Email,
+                        nombre_completo = @NombreCompleto,
+                        fecha_modificacion = NOW()
+                        ");
+            
+            if (!string.IsNullOrEmpty(password))
+            {
+                sqlBuilder.Append(", password_hash = @PasswordHash");
+            }
+
+            sqlBuilder.Append(" WHERE id = @Id");
+
+            var parametros = new DynamicParameters();
+            parametros.Add("Id", usuario.Id);
+            parametros.Add("Username", usuario.Username);
+            parametros.Add("Email", usuario.Email);
+            parametros.Add("NombreCompleto", usuario.NombreCompleto);
+            if (!string.IsNullOrEmpty(password))
+            {
+                parametros.Add("PasswordHash", _passwordService.HashPassword(password));
+            }
+
+            var rows = await connection.ExecuteAsync(sqlBuilder.ToString(), parametros);
+            return rows > 0;
+        }
+
+        public async Task<bool> CambiarEstadoUsuarioAsync(int id, bool activo)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+             var sql = @"UPDATE ""suizaConta"".usuarios SET 
+                        activo = @Activo
+                        WHERE id = @Id";
+             var rows = await connection.ExecuteAsync(sql, new { Id = id, Activo = activo });
+             return rows > 0;
+        }
+        public async Task<(bool Success, int? UsuarioId, List<EmpresaDisponible> Empresas)> ValidarCredencialesAsync(string username, string password)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            
+            // 1. Obtener usuario por username
+            var userSql = @"SELECT id, username, password_hash, activo FROM ""suizaConta"".usuarios WHERE username = @Username AND deleted_at IS NULL";
+            var user = await connection.QueryFirstOrDefaultAsync<dynamic>(userSql, new { Username = username });
+
+            if (user == null || !((bool)user.activo))
+                return (false, null, new List<EmpresaDisponible>());
+
+            // 2. Verificar password
+            if (!_passwordService.VerifyPassword(password, (string)user.password_hash))
+                 return (false, null, new List<EmpresaDisponible>());
+
+            // 3. Obtener empresas
+            var empresasSql = @"
+                SELECT 
+                    e.id AS EmpresaId,
+                    e.nombre_comercial AS EmpresaNombre,
+                    e.ruc AS Ruc,
+                    e.logo_url AS EmpresaLogo,
+                    eu.rol AS Rol
+                FROM ""suizaConta"".empresa_usuarios eu
+                INNER JOIN ""suizaConta"".empresas e ON e.id = eu.empresa_id
+                WHERE eu.usuario_id = @UserId 
+                  AND eu.activo = TRUE 
+                  AND e.activo = TRUE
+                  AND (eu.fecha_fin IS NULL OR eu.fecha_fin >= CURRENT_DATE)";
+            
+            var empresas = await connection.QueryAsync<EmpresaDisponible>(empresasSql, new { UserId = (int)user.id });
+
+            return (true, (int)user.id, empresas.ToList());
         }
     }
 }

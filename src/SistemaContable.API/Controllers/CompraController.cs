@@ -6,6 +6,7 @@ using SistemaContable.Application.DTOs.Responses.Venta;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Domain.Models;
 using System.Security.Claims;
+using System.Text;
 
 namespace SistemaContable.API.Controllers
 {
@@ -119,18 +120,20 @@ namespace SistemaContable.API.Controllers
         [HttpGet]
         [ProducesResponseType(typeof(List<VentaListaDto>), 200)]
         public async Task<ActionResult<List<VentaListaDto>>> ListarCompra(
-            [FromQuery] string fechaDesde,
-            [FromQuery] string fechaHasta,
-            [FromQuery] string rucCliente = null,
-            [FromQuery] string tipoDoc = null,
-            [FromQuery] string estadoDoc = null)
+            [FromQuery] string? fechaDesde = null,
+            [FromQuery] string? fechaHasta = null,
+            [FromQuery] string? rucCliente = null,
+            [FromQuery] string? tipoDoc = null,
+            [FromQuery] string? estadoDoc = null,
+            [FromQuery] string? filtro = null,
+            [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             try
             {
 
                 var usuario = User.Identity?.Name ?? "SYSTEM";
                 var ventas = await _service.ListarCompraAsync(
-                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa);
+                    fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa, page, pageSize, filtro);
 
                 return Ok(new
                 {
@@ -142,6 +145,46 @@ namespace SistemaContable.API.Controllers
             {
                 _logger.LogError(ex, "Error listando ventas");
                 return StatusCode(500, new { mensaje = "Error al listar ventas" });
+            }
+        }
+
+        [HttpGet("{id}/xml")]
+        public async Task<IActionResult> DescargarXml(int id)
+        {
+            try
+            {
+                var xml = await _service.ObtenerXmlCompraAsync(id);
+                if (string.IsNullOrEmpty(xml)) return NotFound("XML no encontrado");
+
+                var bytes = Encoding.UTF8.GetBytes(xml);
+                return File(bytes, "application/xml", $"Compra_{id}.xml");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error descargando XML {Id}", id);
+                return StatusCode(500, "Error interno");
+            }
+        }
+
+        [HttpGet("excel")]
+        public async Task<IActionResult> DescargarExcel(
+            [FromQuery] string fechaDesde,
+            [FromQuery] string fechaHasta,
+            [FromQuery] string rucCliente = null,
+            [FromQuery] string tipoDoc = null,
+            [FromQuery] string estadoDoc = null)
+        {
+            try
+            {
+                var archivo = await _service.GenerarReporteExcelComprasAsync(
+                   fechaDesde, fechaHasta, rucCliente, tipoDoc, estadoDoc, _RucEmpresa);
+
+                return File(archivo, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Compras_{DateTime.Now:yyyyMMdd}.xlsx");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generando Excel");
+                return StatusCode(500, "Error generando reporte");
             }
         }
 

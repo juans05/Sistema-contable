@@ -9,6 +9,7 @@ namespace SistemaContable.Application.Services.Interfaces.IRepository
 {
     public interface IFacturaElectronicaRepository
     {
+        Task<List<SistemaContable.Application.DTOs.Sire.SireVentaDto>> ListarVentasParaSire(string periodo, string rucEmpresa);
         Task<SpResultado> InsertarFacturaElectronicaAsync(FacturaElectronicaDto factura, string usuario, string rucEmpresa);
         Task<SpResultado> InsertarRegistroVentaAsync(RegistroVentaDto venta, string usuario, string rucEmpresa, int estado);
         Task<SpResultado> InsertarVentaDetalleAsync(int idRegVenta, RegistroVentaDetalleDto detalle);
@@ -17,7 +18,8 @@ namespace SistemaContable.Application.Services.Interfaces.IRepository
         Task<List<VentaListaDto>> ListarVentasAsync(
             string fechaDesde, string fechaHasta,
             string rucCliente = null, string tipoDoc = null,
-            string estadoDoc = null, string _RucEmpresa = null, int limite = 100, int offset = 0);
+            string estadoDoc = null, string _RucEmpresa = null, int limite = 100, int offset = 0, string filtro = null);
+        Task<string> ObtenerXmlPorVentaIdAsync(int idRegVenta);
         Task<SpResultado> ActualizarEstadoSunatAsync(
             int idFactura, string estado, string codigo, string mensaje,
             string cdr = null, string xmlFirmado = null);

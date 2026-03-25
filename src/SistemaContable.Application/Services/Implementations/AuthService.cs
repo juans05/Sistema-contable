@@ -243,5 +243,11 @@ namespace SistemaContable.Application.Services.Implementations
         }
 
 
+
+        public async Task<List<EmpresaDisponible>> PreLoginAsync(string username, string password)
+        {
+            var result = await _authRepository.ValidarCredencialesAsync(username, password);
+            return result.Success ? result.Empresas : null;
+        }
     }
 }

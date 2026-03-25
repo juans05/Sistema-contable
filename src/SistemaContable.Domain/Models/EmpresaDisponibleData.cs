@@ -10,6 +10,7 @@ namespace SistemaContable.Domain.Models
     {
         public Guid EmpresaId { get; set; }
         public string EmpresaNombre { get; set; } = string.Empty;
+        public string? Ruc { get; set; }
         public string? EmpresaLogo { get; set; }
         public string Rol { get; set; } = string.Empty;
         public bool EsPrincipal { get; set; }

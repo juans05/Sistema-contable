@@ -17,3 +17,10 @@ project.lock.json
 .env
 *.env
 *.db
+src/SistemaContable.Infrastructure/Data/Scripts/01_accounting_schema.sql
+src/SistemaContable.Infrastructure/Data/Scripts/02_pcge_seed.sql
+src/SistemaContable.Infrastructure/Data/Scripts/03_update_precision.sql
+src/SistemaContable.Infrastructure/Data/Scripts/04_seed_rules.sql
+src/SistemaContable.Infrastructure/Data/Scripts/05_seed_purchase_rules.sql
+src/SistemaContable.Infrastructure/Data/Scripts/06_productos_schema.sql
+src/SistemaContable.Infrastructure/Data/Scripts/10_update_productos_monedas.sql

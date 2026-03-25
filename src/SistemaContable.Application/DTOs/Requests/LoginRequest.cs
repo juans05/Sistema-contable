@@ -9,8 +9,7 @@ namespace SistemaContable.Application.DTOs.Requests
 {
     public class LoginRequest
     {
-        [Required(ErrorMessage = "El ruc  es requerido")]
-        public string RucEmpresa { get; set; } = string.Empty;
+        public string? RucEmpresa { get; set; }
 
         [Required(ErrorMessage = "El nombre de usuario es requerido")]
         public string Username { get; set; } = string.Empty;

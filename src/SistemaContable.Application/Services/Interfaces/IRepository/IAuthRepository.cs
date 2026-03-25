@@ -1,6 +1,7 @@
 ﻿using SistemaContable.Application.DTOs.Requests;
 using SistemaContable.Application.DTOs.Responses;
 using SistemaContable.Domain.Models;
+using SistemaContable.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,5 +21,11 @@ namespace SistemaContable.Application.Services.Interfaces.IRepository
         Task<RefreshTokenData?> GetRefreshTokenAsync(string tokenHash);
 
         Task<LoginResponse> RefreshTokenAsync(string refreshToken);
+        Task<List<EUsuario>> ListarUsuariosAsync();
+        Task<EUsuario> ObtenerUsuarioPorIdAsync(int id);
+        Task<int> CrearUsuarioAsync(EUsuario usuario, string password);
+        Task<bool> ActualizarUsuarioAsync(EUsuario usuario, string password = null);
+        Task<bool> CambiarEstadoUsuarioAsync(int id, bool activo);
+        Task<(bool Success, int? UsuarioId, List<EmpresaDisponible> Empresas)> ValidarCredencialesAsync(string username, string password);
     }
 }

@@ -241,32 +241,69 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         public async Task<List<VentaListaDto>> ListarVentasAsync(
             string fechaDesde, string fechaHasta,
             string rucCliente = null, string tipoDoc = null,
-            string estadoDoc = null, string _RucEmpresa = null, int limite = 100, int offset = 0)
+            string estadoDoc = null, string _RucEmpresa = null, 
+            int limite = 100, int offset = 0, string filtro = null)
         {
             try
             {
                 await using var connection = new NpgsqlConnection(_connectionString);
                 await connection.OpenAsync();
 
-                var parameters = new
+                var sql = new StringBuilder(@"
+                    SELECT 
+                        v.id_reg_venta AS ""IdRegVenta"",
+                        v.serie_doc || '-' || v.num_doc AS ""NumeroDocumento"",
+                        v.fecha_emision AS ""FechaEmision"",
+                        v.ruc_cliente AS ""RucCliente"",
+                        v.r_s_cliente AS ""RazonSocial"",
+                        v.moneda AS ""Moneda"",
+                        v.total_doc AS ""TotalDoc"",
+                        CAST(v.estado_documento AS TEXT) AS ""EstadoDoc"",
+                        f.estado_sunat AS ""EstadoSunat"",
+                        f.serie || '-' || f.numero AS ""NumeroFactura""
+                    FROM ""suizaConta"".registro_venta v
+                    LEFT JOIN ""suizaConta"".facturas_electronicas f ON v.id_factura_electronica = f.id_factura_electronica
+                    WHERE v.rucempresa = @RucEmpresa
+                      AND v.fecha_emision >= @FechaDesde::date 
+                      AND v.fecha_emision <= @FechaHasta::date
+                ");
+
+                var parameters = new DynamicParameters();
+                parameters.Add("RucEmpresa", _RucEmpresa);
+                parameters.Add("FechaDesde", fechaDesde);
+                parameters.Add("FechaHasta", fechaHasta);
+                parameters.Add("Limit", limite);
+                parameters.Add("Offset", offset);
+
+                if (!string.IsNullOrEmpty(rucCliente))
                 {
-                    p_fecha_desde = fechaDesde,
-                    p_fecha_hasta = fechaHasta,
-                    p_ruc_cliente = rucCliente,
-                    p_tipo_doc = tipoDoc,
-                    p_estado_doc = estadoDoc,
-                    p_ruc_empresa = _RucEmpresa,
-                    p_limite = limite,
-                    p_offset = offset
-                };
+                    sql.Append(" AND v.ruc_cliente = @RucCliente");
+                    parameters.Add("RucCliente", rucCliente);
+                }
 
-                var result = await connection.QueryAsync<VentaListaDto>(
-                    "SELECT * FROM \"suizaConta\".sp_listar_ventas(@p_fecha_desde, @p_fecha_hasta, @p_ruc_cliente, @p_tipo_doc, @p_estado_doc,@p_ruc_empresa, @p_limite, @p_offset)",
-                    parameters,
-                    commandTimeout: 60
-                );
+                if (!string.IsNullOrEmpty(tipoDoc))
+                {
+                    sql.Append(" AND v.tipo_doc = @TipoDoc");
+                    parameters.Add("TipoDoc", tipoDoc);
+                }
+                
+                // Filtro de texto general (Cliente, RUC o Nro Doc)
+                if (!string.IsNullOrEmpty(filtro))
+                {
+                    sql.Append(@" AND (
+                        v.r_s_cliente ILIKE @Filtro 
+                        OR v.ruc_cliente ILIKE @Filtro 
+                        OR (v.serie_doc || '-' || v.num_doc) ILIKE @Filtro
+                    )");
+                    parameters.Add("Filtro", $"%{filtro}%");
+                }
 
-                return result.ToList();
+                sql.Append(" ORDER BY v.fecha_emision DESC LIMIT @Limit OFFSET @Offset");
+
+                var result = await connection.QueryAsync<VentaListaDto>(sql.ToString(), parameters);
+                var lista = result.ToList();
+                _logger.LogInformation("Repository: ListarVentas completado. RucEmpresa: {Ruc}, Encontrados: {Count}", _RucEmpresa, lista.Count);
+                return lista;
             }
             catch (Exception ex)
             {
@@ -368,6 +405,77 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             throw new Exception(resultado.OMensaje ?? "Error al crear factura");
         }
 
-       
+    
+        public async Task<string> ObtenerXmlPorVentaIdAsync(int idRegVenta)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var xml = await connection.QueryFirstOrDefaultAsync<string>(
+                    @"SELECT f.xml_original 
+                      FROM ""suizaConta"".facturas_electronicas f
+                      INNER JOIN ""suizaConta"".registro_venta v ON v.id_factura_electronica = f.id_factura_electronica
+                      WHERE v.id_reg_venta = @Id",
+                    new { Id = idRegVenta },
+                    commandTimeout: 10
+                );
+
+                return xml;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error obteniendo XML de venta {Id}", idRegVenta);
+                return null;
+            }
+        }
+        public async Task<List<SistemaContable.Application.DTOs.Sire.SireVentaDto>> ListarVentasParaSire(string periodo, string rucEmpresa)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var sql = @"
+                    SELECT 
+                        v.id_reg_venta AS Id,
+                        v.rucempresa AS RucEmpresa,
+                        '' AS RazonSocialEmpresa, 
+                        v.periodo AS Periodo,
+                        '' AS Car, 
+                        v.fecha_emision AS FechaEmision,
+                        v.fecha_vencimiento AS FechaVencimiento,
+                        v.tipo_doc AS TipoComprobante,
+                        v.serie_doc AS Serie,
+                        v.num_doc AS Numero,
+                        v.tipo_doc_cliente AS TipoDocCliente,
+                        v.ruc_cliente AS RucCliente,
+                        v.r_s_cliente AS RazonSocialCliente,
+                        0.00 AS ValoFacturadoExportacion,
+                        CASE WHEN v.imp_igv > 0 THEN v.sub_total ELSE 0.00 END AS BaseImponibleGravada,
+                        v.imp_igv AS MontoIgv,
+                        CASE WHEN v.imp_igv = 0 AND v.tipo_doc <> '07' THEN v.sub_total ELSE 0.00 END AS MontoExonerado,
+                        0.00 AS MontoInafecto,
+                        0.00 AS MontoIsc,
+                        0.00 AS MontoIcbper,
+                        0.00 AS OtrosTributos,
+                        v.total_doc AS TotalComprobante,
+                        v.moneda AS Moneda,
+                        v.tip_cambio AS TipoCambio
+                    FROM ""suizaConta"".registro_venta v
+                    WHERE v.periodo = @Periodo 
+                      AND v.rucempresa = @RucEmpresa
+                    ORDER BY v.fecha_emision ASC, v.serie_doc ASC, v.num_doc ASC";
+
+                var result = await connection.QueryAsync<SistemaContable.Application.DTOs.Sire.SireVentaDto>(sql, new { Periodo = periodo, RucEmpresa = rucEmpresa });
+                return result.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listando ventas para SIRE");
+                return new List<SistemaContable.Application.DTOs.Sire.SireVentaDto>();
+            }
+        }
     }
 }

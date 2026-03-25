@@ -17,5 +17,6 @@ namespace SistemaContable.Application.Services.Interfaces
         Task<LoginResponse> SwitchEmpresaAsync(int pusuario_id, string email, Guid ruc_empresa_id);
         Task LogoutAsync(int usuarioId);
         Task<LoginResponse> RefreshTokenAsync(string refreshToken);
+        Task<List<EmpresaDisponible>> PreLoginAsync(string username, string password);
     }
 }
