@@ -13,21 +13,20 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 {
     public class AccountingRepository : IAccountingRepository
     {
-        private readonly string _connectionString;
+        private readonly NpgsqlDataSource _dataSource;
         private readonly ILogger<AccountingRepository> _logger;
 
-        public AccountingRepository(IConfiguration configuration, ILogger<AccountingRepository> logger)
+        public AccountingRepository(NpgsqlDataSource dataSource, ILogger<AccountingRepository> logger)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection") 
-                ?? throw new InvalidOperationException("Connection string no configurada");
-            _logger = logger;
+            _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<List<EReglaContable>> ObtenerReglasPorEventoAsync(string codigoEvento, int empresaId)
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 // Busca reglas específicas de la empresa O reglas genéricas (empresa_id NULL)
                 // Ordenadas por 'orden'
                 var sql = @"
@@ -62,7 +61,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 var sql = @"
                     SELECT 
                         id, codigo, nombre, nivel, tipo_cuenta AS TipoCuenta,
@@ -83,8 +82,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<int> GuardarAsientoCompletoAsync(EAsientoContable asiento)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
+            await using var connection = await _dataSource.OpenConnectionAsync();
             await using var transaction = await connection.BeginTransactionAsync();
 
             try
@@ -127,7 +125,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 var sql = @"
                     SELECT valor 
                     FROM ""suizaConta"".contabilidad_configuracion
@@ -143,7 +141,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         }
         public async Task<List<EEventoContableTipo>> ListarEventosDisponiblesAsync()
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             var sql = @"SELECT id, codigo_evento AS CodigoEvento, descripcion, modulo_origen AS ModuloOrigen 
                         FROM ""suizaConta"".contabilidad_eventos_tipo ORDER BY descripcion";
             var result = await connection.QueryAsync<EEventoContableTipo>(sql);
@@ -152,7 +150,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> GuardarReglaAsync(EReglaContable regla)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             string sql;
             
             if (regla.Id == 0)
@@ -180,7 +178,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> EliminarReglaAsync(int id, int empresaId)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             // Solo borrado lógico
             var sql = @"UPDATE ""suizaConta"".contabilidad_reglas SET activo = FALSE 
                         WHERE id = @Id AND (empresa_id = @EmpresaId OR empresa_id IS NULL)";
@@ -190,8 +188,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> ImportarPlanCuentasAsync(List<EPlanContable> cuentas, int empresaId)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
+            await using var connection = await _dataSource.OpenConnectionAsync();
             await using var transaction = await connection.BeginTransactionAsync();
 
             try
@@ -249,7 +246,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<List<EPlanContable>> ListarPlanCuentasAsync(int empresaId, string busqueda = null)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             var sql = @"
                 SELECT 
                     id, codigo, nombre, nivel, tipo_cuenta AS TipoCuenta,
@@ -272,7 +269,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> GuardarCuentaAsync(EPlanContable cuenta)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             string sql;
             
             // Validar unicidad de código para la empresa si es nuevo
@@ -304,7 +301,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> EliminarCuentaAsync(int id, int empresaId)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             // Soft delete
             var sql = @"UPDATE ""suizaConta"".contabilidad_plan_cuentas SET activo = FALSE 
                         WHERE id = @Id AND empresa_id = @EmpresaId";

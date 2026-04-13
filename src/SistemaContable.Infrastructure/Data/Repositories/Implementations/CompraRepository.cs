@@ -15,14 +15,13 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 {
     public class CompraRepository : ICompraRepository
     {
-        private readonly string _connectionString;
+        private readonly NpgsqlDataSource _dataSource;
         private readonly ILogger<CompraRepository> _logger;
 
-        public CompraRepository(IConfiguration configuration, ILogger<CompraRepository> logger)
+        public CompraRepository(NpgsqlDataSource dataSource, ILogger<CompraRepository> logger)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Connection string no configurada");
-            _logger = logger;
+            _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<SpResultado> InsertarFacturaCompraElectronicaAsync(
@@ -30,8 +29,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var parameters = new
                 {
@@ -77,8 +75,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 var fecha = DateTime.Parse(compra.Periodo);
                 var parameters = new
                 {
@@ -126,8 +123,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var parameters = new
                 {
@@ -164,8 +160,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> ExisteFacturaCompraPorHashAsync(string hash, string ruc)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
+            await using var connection = await _dataSource.OpenConnectionAsync();
 
             return await connection.ExecuteScalarAsync<bool>(
                 @"SELECT EXISTS(
@@ -184,8 +179,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var sqlBuilder = new StringBuilder(@"
                     SELECT 
@@ -256,8 +250,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
              try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 // Simple Get
                 var sql = @"SELECT 
@@ -305,8 +298,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
              try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var xml = await connection.QueryFirstOrDefaultAsync<string>(
                     @"SELECT f.xml_original 
@@ -329,8 +321,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var sql = @"SELECT 
                                 id AS IdRegCompras,
@@ -363,8 +354,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 // Lógica simplificada: Asumimos todo como "Base Imponible Gravada - Destino Gravado" (DG)
                 // En un sistema real, se debería determinar el destino (Gravado, Mixto, No Gravado) según la cuenta contable o configuración.

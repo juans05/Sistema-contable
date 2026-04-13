@@ -21,24 +21,22 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 {
     public class EmpresaRepository : IEmpresaRepository
     {
-        private readonly string _connectionString;
+        private readonly NpgsqlDataSource _dataSource;
         private readonly ILogger<EmpresaRepository> _logger;
 
         public EmpresaRepository(
-            IConfiguration configuration,
+            NpgsqlDataSource dataSource,
             ILogger<EmpresaRepository> logger)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? throw new ArgumentNullException(nameof(configuration));
-            _logger = logger;
+            _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<ApiResponseDto<bool>> ActualizarAsync(UpdateEmpresaRequest dto)
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var parameters = new
                 {
@@ -89,8 +87,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var parameters = new
                 {
@@ -130,8 +127,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var parameters = new
                 {
@@ -185,8 +181,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
 
 
@@ -254,8 +249,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
                     @"SELECT * FROM ""suizaConta"".sp_empresa_eliminar(@p_id)",
@@ -282,8 +276,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var parameters = new
                 {
@@ -327,8 +320,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var contadores = await connection.QueryAsync<EContadorDto>(
                     @"SELECT * FROM ""suizaConta"".sp_contadores_listar()",
@@ -349,8 +341,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var empresa = await connection.QueryFirstOrDefaultAsync<EEmpresa>(
                     @"SELECT * FROM ""suizaConta"".sp_empresa_obtener_por_id(@p_empresa_id)",

@@ -5,6 +5,7 @@
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
     <PackageReference Include="Npgsql" Version="10.0.1" />
+    <PackageReference Include="Npgsql.DependencyInjection" Version="10.0.1" />
   </ItemGroup>
 
   <ItemGroup>

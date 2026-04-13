@@ -11,24 +11,22 @@ namespace SistemaContable.Infrastructurxe.Data.Repositories.Implementations
 {
     public class VentaRepository : IVentaRepository
     {
-        private readonly string _connectionString;
+        private readonly NpgsqlDataSource _dataSource;
         private readonly ILogger<VentaRepository> _logger;
 
         public VentaRepository(
-            IConfiguration configuration,
+            NpgsqlDataSource dataSource,
             ILogger<VentaRepository> logger)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Connection string no configurada");
-            _logger = logger;
+            _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<ERegistroVenta> CrearConDetallesAsync(ERegistroVenta venta)
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 // Convertir detalles a JSON
                 var detallesJson = JsonSerializer.Serialize(venta.Detalles.Select(d => new
@@ -97,8 +95,7 @@ namespace SistemaContable.Infrastructurxe.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 return await connection.ExecuteScalarAsync<bool>(
                     "SELECT sp_existe_venta_por_documento(@p_tipo_doc, @p_serie_doc, @p_num_doc)",
@@ -123,8 +120,7 @@ namespace SistemaContable.Infrastructurxe.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var ventaData = await connection.QueryAsync<VentaPorIdResultado>(
                     "SELECT * FROM sp_obtener_venta_por_id(@p_id_reg_venta)",

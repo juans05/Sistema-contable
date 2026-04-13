@@ -17,13 +17,12 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 {
     public class UserRepository : IAuthRepository
     {
-        private readonly string _connectionString;
+        private readonly NpgsqlDataSource _dataSource;
         private readonly IJwtTokenService _jwtTokenService;
         private readonly IPasswordService _passwordService;
-        public UserRepository(IConfiguration configuration, IJwtTokenService jwtTokenService, IPasswordService passwordService )
+        public UserRepository(NpgsqlDataSource dataSource, IJwtTokenService jwtTokenService, IPasswordService passwordService )
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Connection string no configurada");
+            _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
             _jwtTokenService = jwtTokenService;
             _passwordService = passwordService;
         }
@@ -32,8 +31,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 return await connection.QueryFirstOrDefaultAsync<RefreshTokenData>(
                     @"SELECT 
@@ -62,8 +60,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 var result = await connection.QueryFirstOrDefaultAsync<MeDbResult>(
                      "SELECT * FROM \"suizaConta\".sp_me4(@p_usuario_id, @p_empresa_id)",
                      new { p_usuario_id = usuarioId, p_empresa_id = empresaId }
@@ -111,7 +108,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 await connection.ExecuteAsync(
                     "UPDATE \"suizaConta\".refresh_tokens SET activo = FALSE WHERE usuario_id = @UsuarioId",
                     new { UsuarioId = usuarioId },
@@ -127,8 +124,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<LoginData> LoginAsync(LoginRequest request)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
+            await using var connection = await _dataSource.OpenConnectionAsync();
 
             try
             {
@@ -176,7 +172,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 await connection.ExecuteAsync(@"
                 INSERT INTO ""suizaConta"".refresh_tokens (usuario_id, token_hash, fecha_expiracion, activo)
                 VALUES (@UsuarioId, @TokenHash, @Expiration, TRUE)",
@@ -201,7 +197,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             try
             {
                 int idUsuario = usuarioId;
-                await using var connection = new NpgsqlConnection(_connectionString);
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 await connection.ExecuteAsync(
                     "UPDATE \"suizaConta\".usuarios SET ultimo_acceso = NOW() WHERE id = @UsuarioId",
                     new { UsuarioId = idUsuario },
@@ -222,8 +218,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 // _logger.LogDebug("Procesando refresh token");
 
@@ -434,7 +429,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         }
         public async Task<List<EUsuario>> ListarUsuariosAsync()
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             var sql = @"SELECT 
                         id, username, email, nombre_completo AS NombreCompleto, 
                         activo, fecha_creacion AS FechaCreacion
@@ -447,7 +442,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<EUsuario> ObtenerUsuarioPorIdAsync(int id)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             var sql = @"SELECT 
                         id, username, email, nombre_completo AS NombreCompleto, 
                         activo, fecha_creacion AS FechaCreacion
@@ -458,7 +453,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<int> CrearUsuarioAsync(EUsuario usuario, string password)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             var passwordHash = _passwordService.HashPassword(password);
             var sql = @"INSERT INTO ""suizaConta"".usuarios 
                         (username, email, password_hash, nombre_completo, activo, fecha_creacion)
@@ -477,7 +472,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> ActualizarUsuarioAsync(EUsuario usuario, string password = null)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
             var sqlBuilder = new StringBuilder(@"UPDATE ""suizaConta"".usuarios SET 
                         username = @Username,
                         email = @Email,
@@ -508,7 +503,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> CambiarEstadoUsuarioAsync(int id, bool activo)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = await _dataSource.OpenConnectionAsync();
              var sql = @"UPDATE ""suizaConta"".usuarios SET 
                         activo = @Activo
                         WHERE id = @Id";
@@ -517,8 +512,8 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         }
         public async Task<(bool Success, int? UsuarioId, List<EmpresaDisponible> Empresas)> ValidarCredencialesAsync(string username, string password)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            
+            await using var connection = await _dataSource.OpenConnectionAsync();
+
             // 1. Obtener usuario por username
             var userSql = @"SELECT id, username, password_hash, activo FROM ""suizaConta"".usuarios WHERE username = @Username AND deleted_at IS NULL";
             var user = await connection.QueryFirstOrDefaultAsync<dynamic>(userSql, new { Username = username });

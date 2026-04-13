@@ -9,16 +9,15 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 {
     public class ProductoRepository : IProductoRepository
     {
-        private readonly string _connectionString;
+        private readonly NpgsqlDataSource _dataSource;
         private readonly ILogger<ProductoRepository> _logger;
 
         public ProductoRepository(
-            IConfiguration configuration,
+            NpgsqlDataSource dataSource,
             ILogger<ProductoRepository> logger)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Connection string no configurada");
-            _logger = logger;
+            _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<(List<ProductoDto> productos, int total)> ListarAsync(
@@ -26,8 +25,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 // Query con joins a tablas relacionadas
                 var query = @"
@@ -107,8 +105,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var query = @"
                     SELECT 
@@ -212,8 +209,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 // Calcular precio de venta si hay margen
                 var precioVenta = request.MargenUtilidad.HasValue
@@ -293,8 +289,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 // Calcular precio de venta si hay margen
                 var precioVenta = request.MargenUtilidad.HasValue
@@ -367,8 +362,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var query = "UPDATE productos SET activo = FALSE, updated_at = NOW() WHERE id = @idProducto";
                 var rowsAffected = await connection.ExecuteAsync(query, new { idProducto }, commandTimeout: 30);
@@ -386,8 +380,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var results = await connection.QueryAsync<CategoriaDtoDb>(
                     "SELECT id, nombre, descripcion FROM categorias WHERE activo = TRUE ORDER BY nombre",
@@ -412,8 +405,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var results = await connection.QueryAsync<MarcaDtoDb>(
                     "SELECT id, nombre FROM marcas WHERE activo = TRUE ORDER BY nombre",
@@ -437,8 +429,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var results = await connection.QueryAsync<UnidadMedidaDtoDb>(
                     "SELECT id, codigo, nombre FROM unidades_medida WHERE activo = TRUE ORDER BY nombre",
@@ -463,8 +454,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 var results = await connection.QueryAsync<MonedaDtoDb>("SELECT id, codigo, nombre, simbolo FROM monedas WHERE activo = TRUE ORDER BY id", commandTimeout: 30);
                 return results.Select(r => new MonedaDto { Id = r.id, Codigo = r.codigo, Nombre = r.nombre, Simbolo = r.simbolo }).ToList();
             }
@@ -475,8 +465,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
                 var results = await connection.QueryAsync<PlanContableDtoDb>("SELECT id, codigo, nombre, tipo_cuenta as tipocuenta FROM contabilidad_plan_cuentas WHERE activo = TRUE AND permite_movimiento = TRUE ORDER BY codigo", commandTimeout: 30);
                 return results.Select(r => new PlanContableDto { Id = r.id, Codigo = r.codigo, Nombre = r.nombre, TipoCuenta = r.tipocuenta }).ToList();
             }
@@ -487,8 +476,7 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = new NpgsqlConnection(_connectionString);
-                await connection.OpenAsync();
+                await using var connection = await _dataSource.OpenConnectionAsync();
 
                 var query = @"SELECT COUNT(*) FROM productos 
                              WHERE empresa_id = (SELECT id FROM empresas WHERE ruc = @rucEmpresa LIMIT 1)

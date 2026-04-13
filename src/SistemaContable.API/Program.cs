@@ -118,6 +118,10 @@ builder.Services.AddScoped<IAccountingEngineService, AccountingEngineService>();
 builder.Services.AddScoped<ISireService, SireService>();
 builder.Services.AddScoped<IFinancialDashboardService, FinancialDashboardService>();
 
+// Obtienes tu connection string
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddNpgsqlDataSource(connectionString);
+
 var app = builder.Build();
 
 // ===== CONFIGURACIÓN DEL PIPELINE =====
