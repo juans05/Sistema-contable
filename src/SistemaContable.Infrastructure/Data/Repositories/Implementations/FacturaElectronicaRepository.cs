@@ -10,6 +10,8 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
     public class FacturaElectronicaRepository : IFacturaElectronicaRepository
     {
         private readonly NpgsqlDataSource _dataSource;
+        private readonly NpgsqlConnection _externalConnection;
+        private readonly NpgsqlTransaction _externalTransaction;
         private readonly ILogger<FacturaElectronicaRepository> _logger;
 
         public FacturaElectronicaRepository(
@@ -19,15 +21,28 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
             _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
+
+        public FacturaElectronicaRepository(
+            NpgsqlConnection externalConnection, 
+            NpgsqlTransaction externalTransaction, 
+            ILogger<FacturaElectronicaRepository> logger)
+        {
+            _externalConnection = externalConnection ?? throw new ArgumentNullException(nameof(externalConnection));
+            _externalTransaction = externalTransaction ?? throw new ArgumentNullException(nameof(externalTransaction));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
         public async Task<SpResultado> InsertarFacturaElectronicaAsync(
             FacturaElectronicaDto factura, string usuario, string rucEmpresa)
         {
             try
             {
-                await using var connection = await _dataSource.OpenConnectionAsync();
+                var isExternal = _externalConnection != null;
+                var connection = isExternal ? _externalConnection : await _dataSource.OpenConnectionAsync();
 
-                var parameters = new
+                try
                 {
+                    var parameters = new
+                    {
                     p_serie = factura.Serie,
                     p_numero = factura.Numero,
                     p_numero_completo = factura.NumeroCompleto,
@@ -45,18 +60,24 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     p_ruc_empresa = rucEmpresa
                 };
 
-                var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM \"suizaConta\".sp_insertar_factura_electronica(@p_serie, @p_numero, @p_numero_completo, @p_tipo_documento, @p_fecha_emision, @p_fecha_vencimiento, @p_moneda," +
-                    "                                                             @p_monto_base, @p_monto_igv, @p_monto_total, @p_xml_original, " +
-                    "                                                             @p_codigo_hash, @p_usuario_creacion,@p_estado,@p_ruc_empresa)",
-                    parameters,
-                    commandTimeout: 30
-                );
+                        var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
+                            "SELECT * FROM \"suizaConta\".sp_insertar_factura_electronica(@p_serie, @p_numero, @p_numero_completo, @p_tipo_documento, @p_fecha_emision, @p_fecha_vencimiento, @p_moneda," +
+                            "                                                             @p_monto_base, @p_monto_igv, @p_monto_total, @p_xml_original, " +
+                            "                                                             @p_codigo_hash, @p_usuario_creacion,@p_estado,@p_ruc_empresa)",
+                            parameters,
+                            transaction: isExternal ? _externalTransaction : null,
+                            commandTimeout: 30
+                        );
 
-                return result ?? new SpResultado { OMensaje = "Error: No se obtuvo respuesta del SP" };
-            }
-            catch (Exception ex)
-            {
+                        return result ?? new SpResultado { OMensaje = "Error: No se obtuvo respuesta del SP" };
+                    }
+                    finally
+                    {
+                        if (!isExternal && connection != null) await connection.DisposeAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
                 _logger.LogError(ex, "Error insertando factura electrónica");
                 return new SpResultado
                 {
@@ -70,10 +91,14 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = await _dataSource.OpenConnectionAsync();
-                var fecha = DateTime.Parse(venta.Periodo);
-                var parameters = new
+                var isExternal = _externalConnection != null;
+                var connection = isExternal ? _externalConnection : await _dataSource.OpenConnectionAsync();
+
+                try
                 {
+                    var fecha = DateTime.Parse(venta.Periodo);
+                    var parameters = new
+                    {
                     p_id_factura_electronica = venta.IdFacturaElectronica,
                     p_ruc_cliente = venta.RucCliente,
                     p_periodo = fecha.ToString("yyyyMM"),
@@ -95,17 +120,23 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     p_ruc_empresa= rucEmpresa
                 };
 
-                var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM \"suizaConta\".sp_insertar_registro_venta(@p_id_factura_electronica, @p_ruc_cliente, @p_periodo, @p_rs_cliente, @p_tipo_doc, @p_serie_doc, @p_num_doc," +
-                    " @p_fecha_emision, @p_fecha_vencimiento, @p_tip_cambio, @p_tipo_doc_cliente, @p_moneda, @p_sub_total, @p_imp_igv, @p_total_doc, @p_tip_opera_sunat, @p_usuario_creacion,@p_estado, @p_ruc_empresa)",
-                    parameters,
-                    commandTimeout: 30
-                );
+                        var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
+                            "SELECT * FROM \"suizaConta\".sp_insertar_registro_venta(@p_id_factura_electronica, @p_ruc_cliente, @p_periodo, @p_rs_cliente, @p_tipo_doc, @p_serie_doc, @p_num_doc," +
+                            " @p_fecha_emision, @p_fecha_vencimiento, @p_tip_cambio, @p_tipo_doc_cliente, @p_moneda, @p_sub_total, @p_imp_igv, @p_total_doc, @p_tip_opera_sunat, @p_usuario_creacion,@p_estado, @p_ruc_empresa)",
+                            parameters,
+                            transaction: isExternal ? _externalTransaction : null,
+                            commandTimeout: 30
+                        );
 
-                return result ?? new SpResultado { OMensaje = "Error: No se obtuvo respuesta del SP" };
-            }
-                catch (Exception ex)
-            {
+                        return result ?? new SpResultado { OMensaje = "Error: No se obtuvo respuesta del SP" };
+                    }
+                    finally
+                    {
+                        if (!isExternal && connection != null) await connection.DisposeAsync();
+                    }
+                }
+                    catch (Exception ex)
+                {
                 _logger.LogError(ex, "Error insertando registro de venta");
                 return new SpResultado
                 {
@@ -120,10 +151,13 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = await _dataSource.OpenConnectionAsync();
-                    
-                var parameters = new
-                {
+                var isExternal = _externalConnection != null;
+                var connection = isExternal ? _externalConnection : await _dataSource.OpenConnectionAsync();
+
+                try
+                {     
+                    var parameters = new
+                    {
                     p_id_reg_venta = idRegVenta,
                     p_numero_linea = detalle.NumeroLinea,
                     p_codigo_producto = detalle.CodigoProducto,
@@ -140,16 +174,22 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     p_porcentaje_igv = detalle.PorcentajeIgv
                 };
 
-                var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
-                    "SELECT * FROM \"suizaConta\".sp_insertar_venta_detalle(@p_id_reg_venta, @p_numero_linea, @p_codigo_producto, @p_descripcion_producto, @p_unidad_medida, @p_cantidad, @p_precio_unitario, @p_precio_unitario_con_igv, @p_valor_venta, @p_descuento, @p_monto_igv, @p_total_linea, @p_tipo_afectacion_igv, @p_porcentaje_igv)",
-                    parameters,
-                    commandTimeout: 30
-                );
+                        var result = await connection.QueryFirstOrDefaultAsync<SpResultado>(
+                            "SELECT * FROM \"suizaConta\".sp_insertar_venta_detalle(@p_id_reg_venta, @p_numero_linea, @p_codigo_producto, @p_descripcion_producto, @p_unidad_medida, @p_cantidad, @p_precio_unitario, @p_precio_unitario_con_igv, @p_valor_venta, @p_descuento, @p_monto_igv, @p_total_linea, @p_tipo_afectacion_igv, @p_porcentaje_igv)",
+                            parameters,
+                            transaction: isExternal ? _externalTransaction : null,
+                            commandTimeout: 30
+                        );
 
-                return result ?? new SpResultado { OMensaje = "Error: No se obtuvo respuesta del SP" };
-            }
-            catch (Exception ex)
-            {
+                        return result ?? new SpResultado { OMensaje = "Error: No se obtuvo respuesta del SP" };
+                    }
+                    finally
+                    {
+                        if (!isExternal && connection != null) await connection.DisposeAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
                 _logger.LogError(ex, "Error insertando detalle de venta");
                 return new SpResultado { OMensaje = $"Error: {ex.Message}" };
             }
@@ -336,16 +376,25 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<bool> ExisteFacturaPorHashAsync(string hash,string ruc)
         {
-            await using var connection = await _dataSource.OpenConnectionAsync();
+            var isExternal = _externalConnection != null;
+            var connection = isExternal ? _externalConnection : await _dataSource.OpenConnectionAsync();
 
-            return await connection.ExecuteScalarAsync<bool>(
-                @"SELECT EXISTS(
-                        SELECT 1 FROM ""suizaConta"".facturas_electronicas 
-                        WHERE codigo_hash = @Hash and estado=1 and  rucempresa=@ruc
-                    )",
-                new { Hash = hash, ruc  = ruc },
-                commandTimeout: 10
-            );
+            try
+            {
+                return await connection.ExecuteScalarAsync<bool>(
+                    @"SELECT EXISTS(
+                            SELECT 1 FROM ""suizaConta"".facturas_electronicas 
+                            WHERE codigo_hash = @Hash and estado=1 and  rucempresa=@ruc
+                        )",
+                    new { Hash = hash, ruc  = ruc },
+                    transaction: isExternal ? _externalTransaction : null,
+                    commandTimeout: 10
+                );
+            }
+            finally
+            {
+                if (!isExternal && connection != null) await connection.DisposeAsync();
+            }
         }
 
 

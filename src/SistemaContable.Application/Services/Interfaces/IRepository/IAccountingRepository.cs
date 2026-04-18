@@ -15,7 +15,7 @@ namespace SistemaContable.Application.Services.Interfaces.IRepository
         /// Guarda un asiento contable completo (Cabecera + Detalles) de forma transaccional.
         /// </summary>
         Task<int> GuardarAsientoCompletoAsync(EAsientoContable asiento);
-        
+
         /// <summary>
         /// Busca una cuenta del plan contable por su código.
         /// </summary>

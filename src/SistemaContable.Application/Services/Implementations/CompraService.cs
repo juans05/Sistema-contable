@@ -21,12 +21,14 @@ namespace SistemaContable.Application.Services.Implementations
         private readonly ICompraRepository _compraRepository;
         private readonly ILogger<CompraService> _logger;
         private readonly IAccountingEngineService _accountingEngine;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public CompraService(ICompraRepository compraRepository, IAccountingEngineService accountingEngine, ILogger<CompraService> logger)
+        public CompraService(ICompraRepository compraRepository, IAccountingEngineService accountingEngine, ILogger<CompraService> logger, IUnitOfWork unitOfWork)
         {
             _compraRepository = compraRepository;
             _accountingEngine = accountingEngine;
             _logger = logger;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<AnularVentaResponseDTO> AnularCompraAsync(int idRegVenta, string motivo, string usuario)
@@ -107,6 +109,8 @@ namespace SistemaContable.Application.Services.Implementations
 
                 try
                 {
+                    await _unitOfWork.BeginTransactionAsync();
+
                     // 1. Leer XML
                     using var stream = archivo.OpenReadStream();
                     using var reader = new StreamReader(stream);
@@ -116,8 +120,9 @@ namespace SistemaContable.Application.Services.Implementations
                     var hash = Varios.CalcularHash(xmlContent);
 
                     // 3. Verificar duplicados
-                    if (await _compraRepository.ExisteFacturaCompraPorHashAsync(hash, ruc))
+                    if (await _unitOfWork.CompraRepo.ExisteFacturaCompraPorHashAsync(hash, ruc))
                     {
+                        await _unitOfWork.RollbackAsync();
                         resultado.Procesado = false;
                         resultado.Error = "Documento duplicado (hash ya existe)";
                         response.Resultados.Add(resultado);
@@ -145,11 +150,12 @@ namespace SistemaContable.Application.Services.Implementations
                         RucEmpresa = ruc
                     };
 
-                    var resultadoFacturaCompra = await _compraRepository.InsertarFacturaCompraElectronicaAsync(
+                    var resultadoFacturaCompra = await _unitOfWork.CompraRepo.InsertarFacturaCompraElectronicaAsync(
                         facturaCompraDto, usuario, ruc);
 
                     if (resultadoFacturaCompra.OExisteDuplicado || !resultadoFacturaCompra.OIdFactura.HasValue)
                     {
+                        await _unitOfWork.RollbackAsync();
                         resultado.Procesado = false;
                         resultado.Error = resultadoFacturaCompra.OMensaje;
                         response.Resultados.Add(resultado);
@@ -179,10 +185,11 @@ namespace SistemaContable.Application.Services.Implementations
                         estadoDocumento = 1
                     };
 
-                    var resultadoCompra = await _compraRepository.InsertarRegistroCompraAsync(compraDto, usuario);
+                    var resultadoCompra = await _unitOfWork.CompraRepo.InsertarRegistroCompraAsync(compraDto, usuario);
 
                     if (resultadoCompra.OExisteDuplicado || !resultadoCompra.OIdRegCompra.HasValue)
                     {
+                        await _unitOfWork.RollbackAsync();
                         resultado.Procesado = false;
                         resultado.Error = resultadoCompra.OMensaje;
                         response.Resultados.Add(resultado);
@@ -211,7 +218,7 @@ namespace SistemaContable.Application.Services.Implementations
                             PorcentajeIgv = 18.00m
                         };
 
-                        await _compraRepository.InsertarCompraDetalleAsync(idRegCompra, detalleDto);
+                        await _unitOfWork.CompraRepo.InsertarCompraDetalleAsync(idRegCompra, detalleDto);
                     }
 
                     // 8. Resultado exitoso
@@ -228,17 +235,13 @@ namespace SistemaContable.Application.Services.Implementations
                     // ==========================================
                     //  MOTOR CONTABLE: Generar Asiento Automático
                     // ==========================================
-                    try
-                    {
-                        await _accountingEngine.GenerarAsientoCompraAsync(idRegCompra);
-                    }
-                    catch (Exception exCont)
-                    {
-                        _logger.LogError(exCont, "Error generando asiento contable para Compra {Id}", idRegCompra);
-                    }
+                    await _accountingEngine.GenerarAsientoCompraAsync(idRegCompra, _unitOfWork);
+                    
+                    await _unitOfWork.CommitAsync();
                 }
                 catch (Exception ex)
                 {
+                    await _unitOfWork.RollbackAsync();
                     _logger.LogError(ex, "Error procesando archivo {Archivo}", archivo.FileName);
                     resultado.Procesado = false;
                     resultado.Error = $"Error: {ex.Message}";
@@ -249,7 +252,7 @@ namespace SistemaContable.Application.Services.Implementations
 
             response.Exito = response.ComprasRegistradas > 0;
             response.Mensaje = $"Procesados {response.ComprasRegistradas} de {archivosXml.Count} archivos";
-
+            _logger.LogInformation("Proceso de carga masiva de compras finalizado. {ComprasRegistradas} de {TotalArchivos} procesados exitosamente.", response.ComprasRegistradas, archivosXml.Count);
             return response;
         }
 

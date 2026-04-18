@@ -15,25 +15,31 @@ namespace SistemaContable.Application.Services.Implementations
         private readonly IFacturaElectronicaRepository _ventaRepo;
         private readonly ICompraRepository _compraRepo;
         private readonly ILogger<AccountingEngineService> _logger;
+        private readonly ITokenDataService _tokenDataService;
 
         public AccountingEngineService(
             IAccountingRepository accountingRepo,
             IFacturaElectronicaRepository ventaRepo,
             ICompraRepository compraRepo,
-            ILogger<AccountingEngineService> logger)
-        {
+            ILogger<AccountingEngineService> logger,
+            ITokenDataService tokenDataService)
+        {            
             _accountingRepo = accountingRepo;
             _ventaRepo = ventaRepo;
             _compraRepo = compraRepo;
             _logger = logger;
+            _tokenDataService = tokenDataService;
         }
 
-        public async Task<int> GenerarAsientoVentaAsync(int registroVentaId)
+        public async Task<int> GenerarAsientoVentaAsync(int registroVentaId, IUnitOfWork tx = null)
         {
             try
             {
+                var accountingRepo = tx != null ? tx.AccountingRepo : _accountingRepo;
+                var ventaRepo = tx != null ? tx.FacturaRepo : _ventaRepo;
+
                 // 1. Obtener la Venta Completa
-                 var venta = await _ventaRepo.ObtenerVentaCompletaAsync(registroVentaId);
+                 var venta = await ventaRepo.ObtenerVentaCompletaAsync(registroVentaId);
                 if (venta == null)
                     throw new Exception($"Venta {registroVentaId} no encontrada");
 
@@ -43,18 +49,20 @@ namespace SistemaContable.Application.Services.Implementations
                 string codigoEvento = "VENTA_MERCADERIA_CONTADO";
 
                 // FIXME: Obtener real empresaId
-                int empresaId = 1; 
-                
+                int empresaId = _tokenDataService.GetEmpresaId();
+                if (empresaId == 0)
+                    throw new Exception("Empresa no identificada en el token");
+
                 // Obtener configuración de decimales
                 int decimalesMonto = 2; // Default
-                string configDecimales = await _accountingRepo.ObtenerConfiguracionAsync("DECIMALES_MONEDA_NACIONAL", empresaId);
+                string configDecimales = await accountingRepo.ObtenerConfiguracionAsync("DECIMALES_MONEDA_NACIONAL", empresaId);
                 if (!string.IsNullOrEmpty(configDecimales) && int.TryParse(configDecimales, out int d))
                 {
                     decimalesMonto = d;
                 }
 
                 // 2. Obtener Reglas Configurable
-                var reglas = await _accountingRepo.ObtenerReglasPorEventoAsync(codigoEvento, empresaId);
+                var reglas = await accountingRepo.ObtenerReglasPorEventoAsync(codigoEvento, empresaId);
 
                 if (reglas == null || !reglas.Any())
                 {
@@ -115,7 +123,7 @@ namespace SistemaContable.Application.Services.Implementations
                     }
                     
                     // Buscar descripción de la cuenta para guardarla en el detalle (snapshot)
-                    var planCuenta = await _accountingRepo.ObtenerCuentaPorCodigoAsync(cuentaFinal, empresaId);
+                    var planCuenta = await accountingRepo.ObtenerCuentaPorCodigoAsync(cuentaFinal, empresaId);
                     string descripcionCuenta = planCuenta?.Nombre ?? "CUENTA DESCONOCIDA";
 
                     var linea = new EAsientoContableDetalle
@@ -157,7 +165,7 @@ namespace SistemaContable.Application.Services.Implementations
                 }
 
                 // 5. Guardar Asiento
-                return await _accountingRepo.GuardarAsientoCompletoAsync(asiento);
+                return await accountingRepo.GuardarAsientoCompletoAsync(asiento);
             }
             catch (Exception ex)
             {
@@ -165,93 +173,109 @@ namespace SistemaContable.Application.Services.Implementations
                 throw;
             }
         }
-        public async Task<int> GenerarAsientoCompraAsync(int registroCompraId)
+        public async Task<int> GenerarAsientoCompraAsync(int registroCompraId, IUnitOfWork tx = null)
         {
             try
             {
+                var accountingRepo = tx != null ? tx.AccountingRepo : _accountingRepo;
+                var compraRepo = tx != null ? tx.CompraRepo : _compraRepo;
+
                 // 1. Obtener Compra
-                var compra = await _compraRepo.ObtenerCompraPorIdAsync(registroCompraId);
-                // NOTA: Asumiendo que ObtenerCompraPorIdAsync devuelve la entidad completa. 
-                // Si no existe tal método, deberíamos verificar CompraRepository.
-                
+                var compra = await compraRepo.ObtenerCompraPorIdAsync(registroCompraId);
+
                 if (compra == null) throw new Exception($"Compra {registroCompraId} no encontrada");
 
                 // Configuración
-                int empresaId = 1; // FIXME: Real
-                string codigoEvento = "COMPRA_MERCADERIA"; // Por simplicidad, asumimos Mercadería.
-                
+                int empresaId = _tokenDataService.GetEmpresaId();
+                if (empresaId == 0)
+                    throw new Exception("Empresa no identificada en el token");
+                string codigoEvento = "COMPRA_MERCADERIA"; 
+
                 // Obtener decimales
                 int decimalesMonto = 2; 
-                string configDecimales = await _accountingRepo.ObtenerConfiguracionAsync("DECIMALES_MONEDA_NACIONAL", empresaId);
+                string configDecimales = await accountingRepo.ObtenerConfiguracionAsync("DECIMALES_MONEDA_NACIONAL", empresaId);
                 if (!string.IsNullOrEmpty(configDecimales) && int.TryParse(configDecimales, out int d)) decimalesMonto = d;
 
-                // 2. Obtener Reglas
-                var reglas = await _accountingRepo.ObtenerReglasPorEventoAsync(codigoEvento, empresaId);
-                if (reglas == null || !reglas.Any()) return 0;
 
-                // 3. Cabecera Asiento
-                var asiento = new EAsientoContable
+                try
                 {
-                    EmpresaId = empresaId,
-                    Periodo = compra.FEmisc.ToString("yyyyMM"),
-                    FechaContable = compra.FEmisc,
-                    Glosa = $"Compra {compra.SerieDocumento}-{compra.NoDocumento} - {compra.NombreProv}",
-                    OrigenModulo = "COMPRAS",
-                    OrigenIdReferencia = compra.IdRegCompras,
-                    CodigoUnicoOperacion = Guid.NewGuid().ToString().Substring(0, 8),
-                    Moneda = compra.Moneda,
-                    TipoCambio = 3.80m, // FIXME
-                    Estado = "MAYORIZADO",
-                    UsuarioCreacion = "MOTOR_CONTABLE"
-                };
 
-                // 4. Procesar Reglas
-                foreach (var regla in reglas)
-                {
-                    decimal montoCalculado = 0;
-                    switch (regla.FormulaMonto)
+                    // 2. Obtener Reglas
+                    var reglas = await accountingRepo.ObtenerReglasPorEventoAsync(codigoEvento, empresaId);
+                    if (reglas == null || !reglas.Any())
                     {
-                        case "TOTAL": montoCalculado = compra.TotalDoc; break;
-                        case "BASE_IMPONIBLE": montoCalculado = compra.SubTotal; break;
-                        case "IGV": montoCalculado = compra.ImpIgv; break;
-                        default: montoCalculado = 0; break;
+                        return 0;
                     }
 
-                    if (montoCalculado == 0) continue;
-                    montoCalculado = Math.Round(montoCalculado, decimalesMonto);
-
-                    var planCuenta = await _accountingRepo.ObtenerCuentaPorCodigoAsync(regla.CuentaCodigoBase, empresaId);
-                    
-                    var linea = new EAsientoContableDetalle
+                    // 3. Cabecera Asiento
+                    var asiento = new EAsientoContable
                     {
-                        CuentaCodigo = regla.CuentaCodigoBase,
-                        DescripcionCuenta = planCuenta?.Nombre ?? "DESC",
-                        Orden = regla.Orden
+                        EmpresaId = empresaId,
+                        Periodo = compra.FEmisc.ToString("yyyyMM"),
+                        FechaContable = compra.FEmisc,
+                        Glosa = $"Compra {compra.SerieDocumento}-{compra.NoDocumento} - {compra.NombreProv}",
+                        OrigenModulo = "COMPRAS",
+                        OrigenIdReferencia = compra.IdRegCompras,
+                        CodigoUnicoOperacion = Guid.NewGuid().ToString().Substring(0, 8),
+                        Moneda = compra.Moneda,
+                        TipoCambio = 3.80m, // FIXME
+                        Estado = "MAYORIZADO",
+                        UsuarioCreacion = "MOTOR_CONTABLE"
                     };
 
-                    if (regla.Naturaleza == "D")
+                    // 4. Procesar Reglas
+                    foreach (var regla in reglas)
                     {
-                        linea.DebeOrigen = montoCalculado;
-                        if (compra.Moneda == "PEN") linea.DebePen = montoCalculado;
-                        else linea.DebeUsd = montoCalculado;
+                        decimal montoCalculado = 0;
+                        switch (regla.FormulaMonto)
+                        {
+                            case "TOTAL": montoCalculado = compra.TotalDoc; break;
+                            case "BASE_IMPONIBLE": montoCalculado = compra.SubTotal; break;
+                            case "IGV": montoCalculado = compra.ImpIgv; break;
+                            default: montoCalculado = 0; break;
+                        }
+
+                        if (montoCalculado == 0) continue;
+                        montoCalculado = Math.Round(montoCalculado, decimalesMonto);
+
+                        var planCuenta = await accountingRepo.ObtenerCuentaPorCodigoAsync(regla.CuentaCodigoBase, empresaId);
+
+                        var linea = new EAsientoContableDetalle
+                        {
+                            CuentaCodigo = regla.CuentaCodigoBase,
+                            DescripcionCuenta = planCuenta?.Nombre ?? "DESC",
+                            Orden = regla.Orden
+                        };
+
+                        if (regla.Naturaleza == "D")
+                        {
+                            linea.DebeOrigen = montoCalculado;
+                            if (compra.Moneda == "PEN") linea.DebePen = montoCalculado;
+                            else linea.DebeUsd = montoCalculado;
+                        }
+                        else
+                        {
+                            linea.HaberOrigen = montoCalculado;
+                            if (compra.Moneda == "PEN") linea.HaberPen = montoCalculado;
+                            else linea.HaberUsd = montoCalculado;
+                        }
+                        asiento.Detalles.Add(linea);
                     }
-                    else
-                    {
-                        linea.HaberOrigen = montoCalculado;
-                        if (compra.Moneda == "PEN") linea.HaberPen = montoCalculado;
-                        else linea.HaberUsd = montoCalculado;
-                    }
-                    asiento.Detalles.Add(linea);
+
+                    // 5. Validar y Guardar (Provisión)
+                    int asientoId = await accountingRepo.GuardarAsientoCompletoAsync(asiento);
+
+                    // 6. Generar Asiento de DESTINO (20 vs 61) si aplica
+                    await GenerarDestinoAutomatico(compra, empresaId, decimalesMonto, accountingRepo);
+
+
+                    return asientoId;
                 }
-
-                // 5. Validar y Guardar (Provisión)
-                int asientoId = await _accountingRepo.GuardarAsientoCompletoAsync(asiento);
-
-                // 6. Generar Asiento de DESTINO (20 vs 61) si aplica
-                // Aquí podríamos llamar recursivamente con evento 'DESTINO_MERCADERIA'
-                await GenerarDestinoAutomatico(compra, empresaId, decimalesMonto);
-
-                return asientoId;
+                catch (Exception exTransaction)
+                {
+                    _logger.LogError(exTransaction, "Error durante la transacción del asiento compra {Id}", registroCompraId);
+                    throw;
+                }
             }
             catch (Exception ex)
             {
@@ -260,12 +284,12 @@ namespace SistemaContable.Application.Services.Implementations
             }
         }
 
-        private async Task GenerarDestinoAutomatico(ERegistroCompra compra, int empresaId, int decimales)
+        private async Task GenerarDestinoAutomatico(ERegistroCompra compra, int empresaId, int decimales, IAccountingRepository txRepo)
         {
             try 
             {
                 string codigoEvento = "DESTINO_MERCADERIA";
-                var reglas = await _accountingRepo.ObtenerReglasPorEventoAsync(codigoEvento, empresaId);
+                var reglas = await txRepo.ObtenerReglasPorEventoAsync(codigoEvento, empresaId);
                 if (reglas == null || !reglas.Any()) return;
 
                 var asiento = new EAsientoContable
@@ -289,12 +313,12 @@ namespace SistemaContable.Application.Services.Implementations
                     if (monto == 0) continue;
                     monto = Math.Round(monto, decimales);
 
-                    var plan = await _accountingRepo.ObtenerCuentaPorCodigoAsync(regla.CuentaCodigoBase, empresaId);
+                    var plan = await txRepo.ObtenerCuentaPorCodigoAsync(regla.CuentaCodigoBase, empresaId);
 
                     var linea = new EAsientoContableDetalle
                     {
                         CuentaCodigo = regla.CuentaCodigoBase,
-                        DescripcionCuenta = plan?.Nombre,
+                        DescripcionCuenta = plan?.Nombre??string.Empty,
                         Orden = regla.Orden
                     };
 
@@ -308,10 +332,14 @@ namespace SistemaContable.Application.Services.Implementations
                     asiento.Detalles.Add(linea);
                 }
 
-                await _accountingRepo.GuardarAsientoCompletoAsync(asiento);
+                await txRepo.GuardarAsientoCompletoAsync(asiento);
             }
 
-            catch(Exception ex) { _logger.LogError(ex, "Error destino compra"); }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Error destino compra");
+                throw; // Lanza error para abortar la transacción completa
+            }
         }
 
         public async Task<bool> ImportarPlanCuentasExcelAsync(System.IO.Stream excelStream, int empresaId)

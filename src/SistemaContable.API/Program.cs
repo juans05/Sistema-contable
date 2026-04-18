@@ -2,11 +2,8 @@
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SistemaContable.API.Middlewares;
-using SistemaContable.Application.Services.Implementations;
-using SistemaContable.Application.Services.Interfaces;
-using SistemaContable.Application.Services.Interfaces.IRepository;
-using SistemaContable.Infrastructure.Data.Repositories.Implementations;
-using SistemaContable.Infrastructurxe.Data.Repositories.Implementations;
+using SistemaContable.Application;
+using SistemaContable.Infrastructure;
 using System.Text;
 using System.Text.Json;
 
@@ -83,44 +80,39 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// CORS
+// ==== CORS ====
+var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+var isQA = builder.Environment.EnvironmentName == "QA";
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("StrictCorsPolicy", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        if (isQA)
+        {
+            // Acceso general solo en QA
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
+        else if (allowedOrigins.Length > 0)
+        {
+            // Política estricta: Orígenes desde appsettings.json
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials(); // Necesario si se usan cookies o headers específicos de auth
+        }
     });
 });
 
 // ===== INYECCIÓN DE DEPENDENCIAS =====
-builder.Services.AddHttpContextAccessor(); // ⭐ AGREGADO
+// Capa de Infraestructura
+builder.Services.AddInfrastructureServices(builder.Configuration);
 
-// Repositories
-builder.Services.AddScoped<IAuthRepository, UserRepository>();
-builder.Services.AddScoped<IVentaRepository, VentaRepository>();
-builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
-builder.Services.AddScoped<IFacturaElectronicaRepository, FacturaElectronicaRepository>();
-builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
-builder.Services.AddScoped<ICompraRepository, CompraRepository>();
-// Services
-builder.Services.AddSingleton<IPasswordService, PasswordService>();
-builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IVentaElectronicaService, VentaElectronicaService>();
-builder.Services.AddScoped<IRucEmpresaService, RucEmpresaService>();
-builder.Services.AddScoped<IEmpresaService, EmpresaService>();
-builder.Services.AddScoped<ICompraService, CompraService>();
-builder.Services.AddScoped<IProductoService, ProductoService>();
-builder.Services.AddScoped<IAccountingRepository, AccountingRepository>();
-builder.Services.AddScoped<IAccountingEngineService, AccountingEngineService>();
-builder.Services.AddScoped<ISireService, SireService>();
-builder.Services.AddScoped<IFinancialDashboardService, FinancialDashboardService>();
+// Capa de Aplicación
+builder.Services.AddApplicationServices();
 
-// Obtienes tu connection string
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddNpgsqlDataSource(connectionString);
 
 var app = builder.Build();
 
@@ -138,7 +130,7 @@ if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "QA")
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+app.UseCors("StrictCorsPolicy");
 
 // Middleware personalizado
 app.UseMiddleware<RucEmpresaMiddleware>();

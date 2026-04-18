@@ -14,11 +14,22 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
     public class AccountingRepository : IAccountingRepository
     {
         private readonly NpgsqlDataSource _dataSource;
+        private readonly NpgsqlConnection _externalConnection;
+        private readonly NpgsqlTransaction _externalTransaction;
         private readonly ILogger<AccountingRepository> _logger;
 
+        // Inyección por defecto (NpgsqlDataSource)
         public AccountingRepository(NpgsqlDataSource dataSource, ILogger<AccountingRepository> logger)
         {
             _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
+        // Inyección para UnitOfWork
+        public AccountingRepository(NpgsqlConnection externalConnection, NpgsqlTransaction externalTransaction, ILogger<AccountingRepository> logger)
+        {
+            _externalConnection = externalConnection ?? throw new ArgumentNullException(nameof(externalConnection));
+            _externalTransaction = externalTransaction ?? throw new ArgumentNullException(nameof(externalTransaction));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -26,29 +37,38 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = await _dataSource.OpenConnectionAsync();
-                // Busca reglas específicas de la empresa O reglas genéricas (empresa_id NULL)
-                // Ordenadas por 'orden'
-                var sql = @"
-                    SELECT 
-                        r.id, r.evento_tipo_id AS EventoTipoId, r.orden,
-                        r.cuenta_codigo_base AS CuentaCodigoBase,
-                        r.cuenta_dinamica_tipo AS CuentaDinamicaTipo,
-                        r.naturaleza,
-                        r.formula_monto AS FormulaMonto,
-                        r.glosa_plantilla AS GlosaPlantilla,
-                        r.condicion_sql AS CondicionSql,
-                        r.empresa_id AS EmpresaId,
-                        r.activo
-                    FROM ""suizaConta"".contabilidad_reglas r
-                    INNER JOIN ""suizaConta"".contabilidad_eventos_tipo e ON e.id = r.evento_tipo_id
-                    WHERE e.codigo_evento = @CodigoEvento
-                      AND r.activo = TRUE
-                      AND (r.empresa_id = @EmpresaId OR r.empresa_id IS NULL)
-                    ORDER BY r.orden ASC";
+                var isExternal = _externalConnection != null;
+                var connection = isExternal ? _externalConnection : await _dataSource.OpenConnectionAsync();
 
-                var result = await connection.QueryAsync<EReglaContable>(sql, new { CodigoEvento = codigoEvento, EmpresaId = empresaId });
-                return result.ToList();
+                try
+                {
+                    // Busca reglas específicas de la empresa O reglas genéricas (empresa_id NULL)
+                    // Ordenadas por 'orden'
+                    var sql = @"
+                        SELECT 
+                            r.id, r.evento_tipo_id AS EventoTipoId, r.orden,
+                            r.cuenta_codigo_base AS CuentaCodigoBase,
+                            r.cuenta_dinamica_tipo AS CuentaDinamicaTipo,
+                            r.naturaleza,
+                            r.formula_monto AS FormulaMonto,
+                            r.glosa_plantilla AS GlosaPlantilla,
+                            r.condicion_sql AS CondicionSql,
+                            r.empresa_id AS EmpresaId,
+                            r.activo
+                        FROM ""suizaConta"".contabilidad_reglas r
+                        INNER JOIN ""suizaConta"".contabilidad_eventos_tipo e ON e.id = r.evento_tipo_id
+                        WHERE e.codigo_evento = @CodigoEvento
+                          AND r.activo = TRUE
+                          AND (r.empresa_id = @EmpresaId OR r.empresa_id IS NULL)
+                        ORDER BY r.orden ASC";
+
+                    var result = await connection.QueryAsync<EReglaContable>(sql, new { CodigoEvento = codigoEvento, EmpresaId = empresaId }, isExternal ? _externalTransaction : null);
+                    return result.ToList();
+                }
+                finally
+                {
+                    if (!isExternal && connection != null) await connection.DisposeAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -61,17 +81,26 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
         {
             try
             {
-                await using var connection = await _dataSource.OpenConnectionAsync();
-                var sql = @"
-                    SELECT 
-                        id, codigo, nombre, nivel, tipo_cuenta AS TipoCuenta,
-                        moneda, analisis, permite_movimiento AS PermiteMovimiento, activo
-                    FROM ""suizaConta"".contabilidad_plan_cuentas
-                    WHERE codigo = @Codigo 
-                      AND (empresa_id = @EmpresaId OR empresa_id IS NULL)
-                    LIMIT 1";
+                var isExternal = _externalConnection != null;
+                var connection = isExternal ? _externalConnection : await _dataSource.OpenConnectionAsync();
 
-                return await connection.QueryFirstOrDefaultAsync<EPlanContable>(sql, new { Codigo = codigo, EmpresaId = empresaId });
+                try
+                {
+                    var sql = @"
+                        SELECT 
+                            id, codigo, nombre, nivel, tipo_cuenta AS TipoCuenta,
+                            moneda, analisis, permite_movimiento AS PermiteMovimiento, activo
+                        FROM ""suizaConta"".contabilidad_plan_cuentas
+                        WHERE codigo = @Codigo 
+                          AND (empresa_id = @EmpresaId OR empresa_id IS NULL)
+                        LIMIT 1";
+
+                    return await connection.QueryFirstOrDefaultAsync<EPlanContable>(sql, new { Codigo = codigo, EmpresaId = empresaId }, isExternal ? _externalTransaction : null);
+                }
+                finally
+                {
+                    if (!isExternal && connection != null) await connection.DisposeAsync();
+                }
             }
             catch(Exception ex)
             {
@@ -82,8 +111,9 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
 
         public async Task<int> GuardarAsientoCompletoAsync(EAsientoContable asiento)
         {
-            await using var connection = await _dataSource.OpenConnectionAsync();
-            await using var transaction = await connection.BeginTransactionAsync();
+            var isExternal = _externalConnection != null;
+            var connection = isExternal ? _externalConnection : await _dataSource.OpenConnectionAsync();
+            var transaction = isExternal ? _externalTransaction : await connection.BeginTransactionAsync();
 
             try
             {
@@ -111,29 +141,46 @@ namespace SistemaContable.Infrastructure.Data.Repositories.Implementations
                     await connection.ExecuteAsync(sqlDetalle, det, transaction);
                 }
 
-                await transaction.CommitAsync();
+                if (!isExternal) await transaction.CommitAsync();
                 return asientoId;
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                if (!isExternal) await transaction.RollbackAsync();
                 _logger.LogError(ex, "Error guardando asiento contable transacción");
                 throw;
+            }
+            finally
+            {
+                if (!isExternal)
+                {
+                    if (transaction != null) await transaction.DisposeAsync();
+                    if (connection != null) await connection.DisposeAsync();
+                }
             }
         }
         public async Task<string> ObtenerConfiguracionAsync(string clave, int empresaId)
         {
             try
             {
-                await using var connection = await _dataSource.OpenConnectionAsync();
-                var sql = @"
-                    SELECT valor 
-                    FROM ""suizaConta"".contabilidad_configuracion
-                    WHERE empresa_id = @EmpresaId AND clave = @Clave";
-                
-                return await connection.ExecuteScalarAsync<string>(sql, new { EmpresaId = empresaId, Clave = clave });
+                var isExternal = _externalConnection != null;
+                var connection = isExternal ? _externalConnection : await _dataSource.OpenConnectionAsync();
+
+                try
+                {
+                    var sql = @"
+                        SELECT valor 
+                        FROM ""suizaConta"".contabilidad_configuracion
+                        WHERE empresa_id = @EmpresaId AND clave = @Clave";
+
+                    return await connection.ExecuteScalarAsync<string>(sql, new { EmpresaId = empresaId, Clave = clave }, isExternal ? _externalTransaction : null);
+                }
+                finally
+                {
+                    if (!isExternal && connection != null) await connection.DisposeAsync();
+                }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // No loguear error, puede ser algo frecuente no encontrar config
                 return null;

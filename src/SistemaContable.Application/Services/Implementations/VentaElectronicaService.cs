@@ -1,23 +1,16 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using ClosedXML.Excel;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using SistemaContable.Application.DTOs;
 using SistemaContable.Application.DTOs.Common;
 using SistemaContable.Application.DTOs.Responses.Venta;
-using SistemaContable.Application.DTOs.Responses.XML;
 using SistemaContable.Application.Services.Interfaces;
 using SistemaContable.Application.Services.Interfaces.IRepository;
 using SistemaContable.Common.Helpers;
-using SistemaContable.Domain.Entities;
 using SistemaContable.Domain.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Xml.Linq;
-using ClosedXML.Excel;
 
 namespace SistemaContable.Application.Services.Implementations
 {
@@ -27,17 +20,20 @@ namespace SistemaContable.Application.Services.Implementations
         private readonly IFacturaElectronicaRepository _facturaRepository;
         private readonly ILogger<VentaElectronicaService> _logger;
         private readonly IAccountingEngineService _accountingEngine;
+        private readonly IUnitOfWork _unitOfWork;
 
         public VentaElectronicaService(
             IVentaRepository ventaRepository,
             IFacturaElectronicaRepository facturaRepository,
             IAccountingEngineService accountingEngine,
-            ILogger<VentaElectronicaService> logger)
+            ILogger<VentaElectronicaService> logger,
+            IUnitOfWork unitOfWork)
         {
             _ventaRepository = ventaRepository;
             _facturaRepository = facturaRepository;
             _accountingEngine = accountingEngine;
             _logger = logger;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<List<VentaListaDto>> ListarVentasAsync(string fechaDesde, string fechaHasta, string rucCliente = null,
@@ -110,6 +106,8 @@ namespace SistemaContable.Application.Services.Implementations
 
                 try
                 {
+                    await _unitOfWork.BeginTransactionAsync();
+
                     // 1. Leer XML
                     using var stream = archivo.OpenReadStream();
                     using var reader = new StreamReader(stream);
@@ -119,8 +117,9 @@ namespace SistemaContable.Application.Services.Implementations
                     var hash = CalcularHash(xmlContent);
 
                     // 3. Verificar duplicados
-                    if (await _facturaRepository.ExisteFacturaPorHashAsync(hash, ruc))
+                    if (await _unitOfWork.FacturaRepo.ExisteFacturaPorHashAsync(hash, ruc))
                     {
+                        await _unitOfWork.RollbackAsync();
                         resultado.Procesado = false;
                         resultado.Error = "Documento duplicado (hash ya existe)";
                         response.Resultados.Add(resultado);
@@ -148,11 +147,12 @@ namespace SistemaContable.Application.Services.Implementations
                         RucEmpresa = ruc
                     };
 
-                    var resultadoFactura = await _facturaRepository.InsertarFacturaElectronicaAsync(
+                    var resultadoFactura = await _unitOfWork.FacturaRepo.InsertarFacturaElectronicaAsync(
                         facturaDto, usuario, ruc);
 
                     if (resultadoFactura.OExisteDuplicado || !resultadoFactura.OIdFactura.HasValue)
                     {
+                        await _unitOfWork.RollbackAsync();
                         resultado.Procesado = false;
                         resultado.Error = resultadoFactura.OMensaje;
                         response.Resultados.Add(resultado);
@@ -183,10 +183,11 @@ namespace SistemaContable.Application.Services.Implementations
                         RucEmpresa = ruc
                     };
 
-                    var resultadoVenta = await _facturaRepository.InsertarRegistroVentaAsync(ventaDto, usuario,ruc,1);
+                    var resultadoVenta = await _unitOfWork.FacturaRepo.InsertarRegistroVentaAsync(ventaDto, usuario,ruc,1);
 
                     if (resultadoVenta.OExisteDuplicado || !resultadoVenta.OIdRegVenta.HasValue)
                     {
+                        await _unitOfWork.RollbackAsync();
                         resultado.Procesado = false;
                         resultado.Error = resultadoVenta.OMensaje;
                         response.Resultados.Add(resultado);
@@ -215,7 +216,7 @@ namespace SistemaContable.Application.Services.Implementations
                             PorcentajeIgv = 18.00m
                         };
 
-                        await _facturaRepository.InsertarVentaDetalleAsync(idRegVenta, detalleDto);
+                        await _unitOfWork.FacturaRepo.InsertarVentaDetalleAsync(idRegVenta, detalleDto);
                     }
 
                     // 8. Resultado exitoso
@@ -232,18 +233,13 @@ namespace SistemaContable.Application.Services.Implementations
                     // ==========================================
                     //  MOTOR CONTABLE: Generar Asiento Automático
                     // ==========================================
-                    try
-                    {
-                        await _accountingEngine.GenerarAsientoVentaAsync(idRegVenta);
-                    }
-                    catch (Exception exCont)
-                    {
-                        // No bloqueamos el proceso de venta si falla la conta, pero logueamos
-                        _logger.LogError(exCont, "Error generando asiento contable para Venta {Id}", idRegVenta);
-                    }
+                    await _accountingEngine.GenerarAsientoVentaAsync(idRegVenta, _unitOfWork);
+
+                    await _unitOfWork.CommitAsync();
                 }
                 catch (Exception ex)
                 {
+                    await _unitOfWork.RollbackAsync();
                     _logger.LogError(ex, "Error procesando archivo {Archivo}", archivo.FileName);
                     resultado.Procesado = false;
                     resultado.Error = $"Error: {ex.Message}";
@@ -254,7 +250,8 @@ namespace SistemaContable.Application.Services.Implementations
 
             response.Exito = response.VentasRegistradas > 0;
             response.Mensaje = $"Procesados {response.VentasRegistradas} de {archivosXml.Count} archivos";
-
+            _logger.LogInformation("Proceso de XML finalizado: {VentasRegistradas} ventas registradas, {TotalArchivos} archivos procesados",
+                response.VentasRegistradas, archivosXml.Count);
             return response;
         }
         public static string LimpiarXml(string xml)
