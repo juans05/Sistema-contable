@@ -116,14 +116,21 @@ namespace SistemaContable.Domain.Models
     public class CategoriaDto
     {
         public int Id { get; set; }
+        public string? Codigo { get; set; }
         public string Nombre { get; set; }
         public string? Descripcion { get; set; }
+        public int? CategoriaPadreId { get; set; }
+        public bool Activo { get; set; }
     }
 
     public class MarcaDto
     {
         public int Id { get; set; }
+        public string? Codigo { get; set; }
         public string Nombre { get; set; }
+        public string? Descripcion { get; set; }
+        public string? Origen { get; set; }
+        public bool Activo { get; set; }
     }
 
     public class UnidadMedidaDto
